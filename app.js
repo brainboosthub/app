@@ -1,5 +1,72 @@
 const API_URL =
   'https://script.google.com/macros/s/AKfycbyAvyBkU_vyyHwy5ekl3GIohGkA91WXL8sYIEmoaEEikGoWl7gr-OtUxfECO4fqia2Zfg/exec';
+
+  function callApi(action, data = {}) {
+  return new Promise((resolve, reject) => {
+    const callbackName =
+      'jsonpCallback_' +
+      Date.now() +
+      '_' +
+      Math.floor(Math.random() * 100000);
+
+    const params = new URLSearchParams({
+      action,
+      callback: callbackName
+    });
+
+    Object.keys(data).forEach(key => {
+      const value = data[key];
+
+      params.set(
+        key,
+        typeof value === 'object'
+          ? JSON.stringify(value)
+          : String(value)
+      );
+    });
+
+    const script = document.createElement('script');
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('เชื่อมต่อระบบหลังบ้านหมดเวลา'));
+    }, 20000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      script.remove();
+      delete window[callbackName];
+    }
+
+    window[callbackName] = response => {
+      cleanup();
+
+      if (!response || !response.success) {
+        reject(
+          new Error(
+            response?.message ||
+            'ระบบหลังบ้านตอบกลับไม่สำเร็จ'
+          )
+        );
+        return;
+      }
+
+      resolve(response.data);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(
+        new Error('ไม่สามารถเชื่อมต่อ Google Apps Script')
+      );
+    };
+
+    script.src =
+      API_URL + '?' + params.toString();
+
+    document.body.appendChild(script);
+  });
+}
 const MAX_ATTEMPTS = 3;
 
 let sessionToken = '';
@@ -522,70 +589,4 @@ function statusText(score) {
 function showError(error) {
   const message = error?.message || String(error || 'เกิดข้อผิดพลาด');
   Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: message });
-}
-function callApi(action, data = {}) {
-  return new Promise((resolve, reject) => {
-    const callbackName =
-      'jsonpCallback_' +
-      Date.now() +
-      '_' +
-      Math.floor(Math.random() * 100000);
-
-    const params = new URLSearchParams({
-      action,
-      callback: callbackName
-    });
-
-    Object.keys(data).forEach(key => {
-      const value = data[key];
-
-      params.set(
-        key,
-        typeof value === 'object'
-          ? JSON.stringify(value)
-          : String(value)
-      );
-    });
-
-    const script = document.createElement('script');
-
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error('เชื่อมต่อระบบหลังบ้านหมดเวลา'));
-    }, 20000);
-
-    function cleanup() {
-      clearTimeout(timer);
-      script.remove();
-      delete window[callbackName];
-    }
-
-    window[callbackName] = response => {
-      cleanup();
-
-      if (!response || !response.success) {
-        reject(
-          new Error(
-            response?.message ||
-            'ระบบหลังบ้านตอบกลับไม่สำเร็จ'
-          )
-        );
-        return;
-      }
-
-      resolve(response.data);
-    };
-
-    script.onerror = () => {
-      cleanup();
-      reject(
-        new Error('ไม่สามารถเชื่อมต่อ Google Apps Script')
-      );
-    };
-
-    script.src =
-      API_URL + '?' + params.toString();
-
-    document.body.appendChild(script);
-  });
 }
