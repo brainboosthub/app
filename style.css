@@ -119,6 +119,9 @@ input:focus {
   background: #fde8e8;
   font-size: 48px;
 }
+.mic-circle i{
+    font-size: 60px;
+}
 .mic-circle.listening {
   background: #ffd6d6;
   animation: pulse 1.1s infinite;
