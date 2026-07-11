@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+
   <meta charset="UTF-8">
   <meta name="viewport"
         content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -145,9 +146,9 @@
     <div id="articleProgressBar" class="progress-bar"></div>
   </div>
 
-  <div id="articleCounter" class="counter">
-    คำที่ 1 จาก 20
-  </div>
+<div id="articleCounter" class="counter">
+  ระบบจะประเมินคำสำคัญ 20 คำภายในบทความ
+</div>
 
   <h2 class="article-title">กากับเหยือกน้ำ</h2>
 
@@ -199,25 +200,31 @@
   จนอิ่ม
 </div>
 
-  <div class="article-current-word">
-    คำที่ต้องอ่าน:
-    <strong id="articleTargetWord">ฤดูร้อน</strong>
-  </div>
 
-  <div
-    id="articleMicCircle"
-    class="mic-circle"
-    onclick="startArticleAssessment()"
-  >
-    <i
-      id="articleMicIcon"
-      class="fa fa-microphone-slash"
-    ></i>
-  </div>
 
-  <div id="articleStatusText" class="status">
-    กดไมโครโฟนแล้วอ่านคำที่เน้น
-  </div>
+<div
+  id="articleMicCircle"
+  class="mic-circle"
+  onclick="startContinuousArticleAssessment()"
+>
+  <i
+    id="articleMicIcon"
+    class="fa fa-microphone-slash"
+  ></i>
+</div>
+
+<button
+  id="stopArticleBtn"
+  type="button"
+  class="btn danger hidden"
+  onclick="stopContinuousArticleAssessment()"
+>
+  หยุดและประเมินผล
+</button>
+
+<div id="articleStatusText" class="status">
+  กดไมโครโฟน แล้วอ่านบทความทั้งหมดจนจบ จากนั้นกด "หยุดและประเมินผล"
+</div>
 </section>
     <div id="micTestArea" class="mic-test-area hidden">
       <button
