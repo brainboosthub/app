@@ -49,24 +49,21 @@
       <div id="wordText" class="word">กรรมการ</div>
       <div id="wordMeta" class="word-meta"></div>
 
-      <div class="mic-zone">
-        <div id="micCircle" class="mic-circle">🎤</div>
-        <button id="recordBtn" class="btn danger" onclick="startAssessment()">
-          กดเพื่อเริ่มอ่าน
-        </button>
-        <button
-  type="button"
-  class="btn secondary"
-  style="margin-top:10px;"
-  onclick="testMicrophoneOnly()"
->
-  ทดสอบไมโครโฟน
-</button>
-        <div id="statusText" class="status">
-          เมื่อพร้อม ให้กดปุ่มแล้วอ่านคำที่แสดง
-        </div>
-      </div>
+<div class="mic-zone">
+  <div id="micCircle" class="mic-circle">🎤</div>
 
+  <button
+    id="recordBtn"
+    class="btn danger"
+    onclick="startAssessment()"
+  >
+    กดเพื่อเริ่มอ่าน
+  </button>
+
+  <div id="statusText" class="status">
+    เมื่อพร้อม ให้กดปุ่มแล้วอ่านคำที่แสดง
+  </div>
+</div>
       <div id="resultBox" class="result-box hidden">
         <div class="main-score">
           <span id="finalScore">0%</span>
@@ -93,6 +90,16 @@
         </div>
       </div>
     </section>
+
+    <div id="micTestArea" class="mic-test-area hidden">
+      <button
+        type="button"
+        class="mic-test-link"
+        onclick="testMicrophoneOnly()"
+      >
+        🎤 ทดสอบไมโครโฟน
+      </button>
+    </div>
 
     <section id="summaryView" class="card summary hidden">
       <div class="trophy">🏆</div>
