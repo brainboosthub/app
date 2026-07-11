@@ -165,3 +165,24 @@ input:focus {
   .score-grid { grid-template-columns: repeat(2,1fr); }
   .student-bar { align-items: flex-start; }
 }
+.mic-test-area {
+  text-align: center;
+  margin-top: 8px;
+  margin-bottom: 18px;
+}
+
+.mic-test-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 5px 10px;
+  color: #718094;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.mic-test-link:hover {
+  color: #1477bd;
+  text-decoration: underline;
+}
