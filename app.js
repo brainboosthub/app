@@ -468,18 +468,54 @@ function showResult(data) {
     title: 'ผลการอ่านออกเสียง',
     width: 620,
     allowOutsideClick: false,
-showCancelButton: currentAttempt < MAX_ATTEMPTS,
-cancelButtonText: 'อ่านอีกครั้ง',
 
-confirmButtonText:
-  currentIndex === words.length - 1
-    ? 'ดูผลสรุป'
-    : 'คำถัดไป',
+    showCancelButton: currentAttempt < MAX_ATTEMPTS,
+    cancelButtonText: 'อ่านอีกครั้ง',
 
+    confirmButtonText:
+      currentIndex === words.length - 1
+        ? 'ดูผลสรุป'
+        : 'คำถัดไป',
 
     html: `
       <div class="popup-result">
 
+        <!-- คะแนนข้อนี้และคะแนนสะสม -->
+        <div class="popup-point-summary">
+
+          <div class="popup-point-item">
+            <span class="popup-point-title">คะแนน</span>
+
+            <b class="popup-point-number">
+              ${formatPoint(data.point)}
+            </b>
+
+            <small class="popup-point-full">
+              เต็ม 2 คะแนน
+            </small>
+          </div>
+
+          <div class="popup-point-item">
+            <span class="popup-point-title">คะแนนสะสม</span>
+
+            <b class="popup-point-number">
+              ${formatPoint(data.accumulatedPoint)}
+            </b>
+
+            <small class="popup-point-full">
+              เต็ม ${MAX_ACCUMULATED_SCORE} คะแนน
+            </small>
+          </div>
+
+        </div>
+
+        <!-- คำที่ประเมิน -->
+        <div class="popup-word">
+          คำที่ประเมิน:
+          <strong>${escapeHtml(currentWord)}</strong>
+        </div>
+
+        <!-- ย้ายเปอร์เซ็นต์มาไว้ใต้คำที่ประเมิน -->
         <div class="popup-score">
           ${Math.round(data.finalScore)}%
         </div>
@@ -487,25 +523,8 @@ confirmButtonText:
         <div class="popup-status">
           ${statusText(data.finalScore)}
         </div>
-<div class="popup-point-summary">
-  <div class="popup-current-point">
-    <b>${formatPoint(data.point)}</b>
-    <span>คะแนนข้อนี้</span>
-  </div>
 
-  <div class="popup-accumulated-point">
-    <b>
-      ${formatPoint(data.accumulatedPoint)}
-      <small>/ ${MAX_ACCUMULATED_SCORE}</small>
-    </b>
-    <span>คะแนนสะสม</span>
-  </div>
-</div>
-        <div class="popup-word">
-          คำที่ประเมิน:
-          <strong>${escapeHtml(currentWord)}</strong>
-        </div>
-
+        <!-- รายละเอียดคะแนน -->
         <div class="popup-score-grid">
           <div>
             <b>${Math.round(data.accuracy)}</b>
@@ -530,19 +549,16 @@ confirmButtonText:
 
       </div>
     `
-}).then(result => {
+  }).then(result => {
+    if (result.isConfirmed) {
+      nextWord();
+      return;
+    }
 
-  if (result.isConfirmed) {
-    nextWord();
-    return;
-  }
-
-  if (result.dismiss === Swal.DismissReason.cancel) {
-    retryCurrentWord();
-    return;
-  }
-
-});
+    if (result.dismiss === Swal.DismissReason.cancel) {
+      retryCurrentWord();
+    }
+  });
 }
 async function saveResult(data) {
   const item = words[currentIndex];
