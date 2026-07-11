@@ -456,13 +456,14 @@ function showResult(data) {
     title: 'ผลการอ่านออกเสียง',
     width: 620,
     allowOutsideClick: false,
-    confirmButtonText:
-      currentIndex === words.length - 1
-        ? 'ดูผลสรุป'
-        : 'คำถัดไป',
-    showDenyButton: currentAttempt < MAX_ATTEMPTS,
-    denyButtonText: 'อ่านอีกครั้ง',
-     reverseButtons: true,
+showCancelButton: currentAttempt < MAX_ATTEMPTS,
+cancelButtonText: 'อ่านอีกครั้ง',
+
+confirmButtonText:
+  currentIndex === words.length - 1
+    ? 'ดูผลสรุป'
+    : 'คำถัดไป',
+
 
     html: `
       <div class="popup-result">
@@ -504,16 +505,19 @@ function showResult(data) {
 
       </div>
     `
-  }).then(result => {
-    if (result.isDenied) {
-      retryCurrentWord();
-      return;
-    }
+}).then(result => {
 
-    if (result.isConfirmed) {
-      nextWord();
-    }
-  });
+  if (result.isConfirmed) {
+    nextWord();
+    return;
+  }
+
+  if (result.dismiss === Swal.DismissReason.cancel) {
+    retryCurrentWord();
+    return;
+  }
+
+});
 }
 async function saveResult(data) {
   const item = words[currentIndex];
