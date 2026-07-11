@@ -457,3 +457,17 @@ input:focus {
     font-size: 14px;
   }
 }
+.popup-grand-total {
+  margin: 12px 0 16px;
+  padding: 13px;
+  border-radius: 13px;
+  background: #eaf7f1;
+  color: #536574;
+}
+
+.popup-grand-total strong {
+  display: block;
+  margin-top: 5px;
+  color: #12845e;
+  font-size: 27px;
+}
