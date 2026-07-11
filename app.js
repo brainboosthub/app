@@ -1,4 +1,3 @@
-<script>
 const MAX_ATTEMPTS = 3;
 
 let sessionToken = '';
@@ -510,4 +509,3 @@ function showError(error) {
   const message = error?.message || String(error || 'เกิดข้อผิดพลาด');
   Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: message });
 }
-</script>
