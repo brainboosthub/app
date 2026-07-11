@@ -559,8 +559,20 @@ function restartTest() {
 
 function showView(id) {
   ['loginView', 'testView', 'summaryView'].forEach(viewId => {
-    document.getElementById(viewId).classList.toggle('hidden', viewId !== id);
+    document
+      .getElementById(viewId)
+      .classList.toggle('hidden', viewId !== id);
   });
+
+  const micTestArea =
+    document.getElementById('micTestArea');
+
+  if (micTestArea) {
+    micTestArea.classList.toggle(
+      'hidden',
+      id !== 'testView'
+    );
+  }
 }
 
 function resetRecorderUI() {
