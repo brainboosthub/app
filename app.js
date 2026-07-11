@@ -357,6 +357,7 @@ function beginAzure(auth) {
     config.applyTo(recognizer);
 
     document.getElementById('micCircle').classList.add('listening');
+setMicIcon(true);
     setButton(document.getElementById('recordBtn'), true, 'กำลังฟังเสียง...');
     document.getElementById('statusText').textContent =
       `กรุณาอ่านคำว่า “${item.word}”`;
@@ -577,6 +578,7 @@ function showView(id) {
 
 function resetRecorderUI() {
   document.getElementById('micCircle').classList.remove('listening');
+setMicIcon(false);
   setButton(document.getElementById('recordBtn'), false, 'กดเพื่อเริ่มอ่าน');
 }
 
@@ -584,8 +586,18 @@ function closeRecognizer() {
   if (!recognizer) return;
   try { recognizer.close(); } catch (e) { console.error(e); }
   recognizer = null;
+  setMicIcon(false);
 }
+function setMicIcon(listening = false) {
+  const icon = document.getElementById('micIcon');
+  if (!icon) return;
 
+  if (listening) {
+    icon.className = 'fa fa-microphone';
+  } else {
+    icon.className = 'fa fa-microphone-slash';
+  }
+}
 function setButton(button, disabled, text) {
   button.disabled = disabled;
   button.textContent = text;
