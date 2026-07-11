@@ -462,6 +462,7 @@ function showResult(data) {
         : 'คำถัดไป',
     showDenyButton: currentAttempt < MAX_ATTEMPTS,
     denyButtonText: 'อ่านอีกครั้ง',
+     reverseButtons: true,
 
     html: `
       <div class="popup-result">
