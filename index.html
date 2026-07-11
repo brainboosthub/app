@@ -1,120 +1,692 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-  <base target="_top">
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>ระบบทดสอบการอ่านออกเสียงภาษาไทย</title>
+const API_URL =
+  'https://script.google.com/macros/s/AKfycbyAvyBkU_vyyHwy5ekl3GIohGkA91WXL8sYIEmoaEEikGoWl7gr-OtUxfECO4fqia2Zfg/exec';
 
-  <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
- <link rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <main class="page">
-    <header class="hero">
-      <div class="hero-icon">ก</div>
-      <div>
-        <h1>ทดสอบการอ่านออกเสียงภาษาไทย</h1>
-        <p>อ่านข้อความทีละคำให้ชัดเจน แล้วระบบจะประเมินผลให้ทันที</p>
+  function callApi(action, data = {}) {
+  return new Promise((resolve, reject) => {
+    const callbackName =
+      'jsonpCallback_' +
+      Date.now() +
+      '_' +
+      Math.floor(Math.random() * 100000);
+
+    const params = new URLSearchParams({
+      action,
+      callback: callbackName
+    });
+
+    Object.keys(data).forEach(key => {
+      const value = data[key];
+
+      params.set(
+        key,
+        typeof value === 'object'
+          ? JSON.stringify(value)
+          : String(value)
+      );
+    });
+
+    const script = document.createElement('script');
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('เชื่อมต่อระบบหลังบ้านหมดเวลา'));
+    }, 20000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      script.remove();
+      delete window[callbackName];
+    }
+
+    window[callbackName] = response => {
+      cleanup();
+
+      if (!response || !response.success) {
+        reject(
+          new Error(
+            response?.message ||
+            'ระบบหลังบ้านตอบกลับไม่สำเร็จ'
+          )
+        );
+        return;
+      }
+
+      resolve(response.data);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(
+        new Error('ไม่สามารถเชื่อมต่อ Google Apps Script')
+      );
+    };
+
+    script.src =
+      API_URL + '?' + params.toString();
+
+    document.body.appendChild(script);
+  });
+}
+const MAX_ATTEMPTS = 3;
+
+let sessionToken = '';
+let student = null;
+let words = [];
+let currentIndex = 0;
+let currentAttempt = 1;
+let completedScores = [];
+let recognizer = null;
+let assessmentInProgress = false;
+
+document.getElementById('studentId').addEventListener('keydown', event => {
+  if (event.key === 'Enter') login();
+});
+
+async function login() {
+  const id = document.getElementById('studentId').value.trim();
+  const button = document.getElementById('loginBtn');
+
+  if (!id) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'กรุณากรอกรหัสนักศึกษา'
+    });
+    return;
+  }
+
+  setButton(button, true, 'กำลังตรวจสอบ...');
+
+  try {
+    const result = await callApi('login', {
+      studentId: id
+    });
+
+    if (!result || !result.success) {
+      throw new Error(
+        result?.message || 'ไม่พบข้อมูลนักศึกษา'
+      );
+    }
+
+    sessionToken = result.sessionToken;
+    student = result;
+
+    document.getElementById('studentName').textContent =
+      result.name || result.studentId;
+
+    document.getElementById('studentLevel').textContent =
+      result.level || '';
+
+    await loadWords();
+
+  } catch (error) {
+    setMicIcon(false);
+    showError(error);
+
+  } finally {
+    setButton(button, false, 'เข้าสู่ระบบ');
+  }
+}
+async function loadWords() {
+  Swal.fire({
+    title: 'กำลังเตรียมแบบทดสอบ',
+    allowOutsideClick: false,
+    didOpen: () => Swal.showLoading()
+  });
+
+  try {
+    const result = await callApi('getWords', {
+      sessionToken
+    });
+
+    words = Array.isArray(result) ? result : [];
+
+    if (!words.length) {
+      throw new Error(
+        'ไม่พบคำทดสอบ กรุณาเพิ่มคำในชีต words'
+      );
+    }
+
+    currentIndex = 0;
+    currentAttempt = 1;
+    completedScores = [];
+
+    Swal.close();
+    showView('testView');
+    renderWord();
+
+  } catch (error) {
+    Swal.close();
+    setMicIcon(false);
+    showError(error);
+  }
+}
+
+function renderWord() {
+  const item = words[currentIndex];
+  const percent = ((currentIndex + 1) / words.length) * 100;
+
+  document.getElementById('counter').textContent =
+    `คำที่ ${currentIndex + 1} จาก ${words.length}`;
+  document.getElementById('progressBar').style.width = percent + '%';
+  document.getElementById('wordText').textContent = item.word;
+  document.getElementById('wordMeta').textContent =
+    [item.level, item.category].filter(Boolean).join(' • ');
+
+  document.getElementById('resultBox').classList.add('hidden');
+  document.getElementById('micCircle').classList.remove('listening');
+  document.getElementById('statusText').textContent =
+    'เมื่อพร้อม ให้กดปุ่มแล้วอ่านคำที่แสดง';
+
+  setButton(
+    document.getElementById('recordBtn'),
+    false,
+    'กดเพื่อเริ่มอ่าน'
+  );
+}
+
+async function startAssessment() {
+  if (assessmentInProgress) return;
+
+  if (typeof SpeechSDK === 'undefined') {
+    Swal.fire({
+      icon: 'error',
+      title: 'โหลด Azure Speech SDK ไม่สำเร็จ',
+      text: 'กรุณารีเฟรชหน้าเว็บแล้วลองใหม่'
+    });
+    return;
+  }
+
+  if (
+    !navigator.mediaDevices ||
+    typeof navigator.mediaDevices.getUserMedia !== 'function'
+  ) {
+    Swal.fire({
+      icon: 'error',
+      title: 'เบราว์เซอร์ไม่รองรับไมโครโฟน',
+      text: 'กรุณาเปิดระบบด้วย Google Chrome หรือ Microsoft Edge เวอร์ชันล่าสุด'
+    });
+    return;
+  }
+
+  try {
+    document.getElementById('statusText').textContent =
+      'กำลังขออนุญาตใช้ไมโครโฟน...';
+
+    /*
+     * ขอสิทธิ์จากการกดปุ่มของผู้ใช้โดยตรง
+     * ต้องทำก่อนเรียก Azure SDK
+     */
+    const testStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+
+    /*
+     * ปิด stream ทดสอบทันที
+     * Azure SDK จะเปิดไมโครโฟนอีกครั้งเอง
+     */
+    testStream.getTracks().forEach(track => track.stop());
+
+  } catch (error) {
+    console.error('Microphone permission error:', error);
+
+    let title = 'ไม่สามารถใช้ไมโครโฟนได้';
+    let message =
+      'กรุณาตรวจสอบไมโครโฟน แล้วลองเปิดหน้าเว็บในแท็บใหม่อีกครั้ง';
+
+    if (
+      error.name === 'NotAllowedError' ||
+      error.name === 'PermissionDeniedError'
+    ) {
+      message =
+        'Chrome ไม่อนุญาตให้หน้าเว็บนี้ใช้ไมโครโฟน กรุณาคลิกไอคอนด้านซ้ายของ URL แล้วตั้งค่าไมโครโฟนเป็น “อนุญาต” จากนั้นรีเฟรชหน้า GitHub Pages ใหม่';
+    } else if (
+      error.name === 'NotFoundError' ||
+      error.name === 'DevicesNotFoundError'
+    ) {
+      message =
+        'ไม่พบอุปกรณ์ไมโครโฟน กรุณาเชื่อมต่อไมโครโฟนหรือตรวจสอบอุปกรณ์เสียงของ Windows';
+    } else if (
+      error.name === 'NotReadableError' ||
+      error.name === 'TrackStartError'
+    ) {
+      message =
+        'ไม่สามารถเปิดไมโครโฟนได้ อาจมีโปรแกรมอื่นกำลังใช้งานอยู่ กรุณาปิด Google Meet, Zoom หรือโปรแกรมบันทึกเสียง แล้วลองใหม่';
+    } else if (error.name === 'SecurityError') {
+      message =
+        'เบราว์เซอร์บล็อกไมโครโฟนเนื่องจากข้อกำหนดด้านความปลอดภัย กรุณาเปิดหน้า GitHub Pages โดยตรง และไม่เปิดผ่าน iframe';
+    }
+
+    Swal.fire({
+      icon: 'warning',
+      title: title,
+      text: message,
+      confirmButtonText: 'ตกลง'
+    });
+
+    document.getElementById('statusText').textContent =
+      'ยังไม่ได้รับอนุญาตให้ใช้ไมโครโฟน';
+
+    return;
+  }
+
+  assessmentInProgress = true;
+
+  document
+    .getElementById('resultBox')
+    .classList.add('hidden');
+
+  setButton(
+    document.getElementById('recordBtn'),
+    true,
+    'กำลังเตรียม...'
+  );
+
+  document.getElementById('statusText').textContent =
+    'กำลังเชื่อมต่อระบบวิเคราะห์เสียง...';
+
+try {
+  const auth = await callApi('getAzureToken', {
+    sessionToken
+  });
+
+  beginAzure(auth);
+
+} catch (error) {
+  assessmentInProgress = false;
+  resetRecorderUI();
+  setMicIcon(false);
+  showError(error);
+}
+}
+
+
+async function testMicrophoneOnly() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true
+    });
+
+    stream.getTracks().forEach(track => track.stop());
+
+    Swal.fire({
+      icon: 'success',
+      title: 'ไมโครโฟนพร้อมใช้งาน',
+      text: 'เบราว์เซอร์อนุญาตให้ระบบใช้ไมโครโฟนแล้ว'
+    });
+
+  } catch (error) {
+    Swal.fire({
+      icon: 'error',
+      title: 'ไมโครโฟนยังใช้งานไม่ได้',
+      text: error.name + ': ' + error.message
+    });
+  }
+}
+
+function beginAzure(auth) {
+  try {
+    const item = words[currentIndex];
+    if (!auth?.token || !auth?.region) {
+      throw new Error('ข้อมูล Azure Token ไม่สมบูรณ์');
+    }
+
+    const speechConfig =
+      SpeechSDK.SpeechConfig.fromAuthorizationToken(auth.token, auth.region);
+
+    speechConfig.speechRecognitionLanguage = 'th-TH';
+    speechConfig.outputFormat = SpeechSDK.OutputFormat.Detailed;
+    speechConfig.setProperty(
+      SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs,
+      '5000'
+    );
+    speechConfig.setProperty(
+      SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs,
+      '1200'
+    );
+
+    const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+    recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+
+    const config = new SpeechSDK.PronunciationAssessmentConfig(
+      item.word,
+      SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
+      SpeechSDK.PronunciationAssessmentGranularity.Word,
+      true
+    );
+    config.applyTo(recognizer);
+
+  document.getElementById('micCircle').classList.add('listening');
+setMicIcon(true);
+    setButton(document.getElementById('recordBtn'), true, 'กำลังฟังเสียง...');
+    document.getElementById('statusText').textContent =
+      `กรุณาอ่านคำว่า “${item.word}”`;
+
+    recognizer.recognizeOnceAsync(
+      result => {
+        closeRecognizer();
+        assessmentInProgress = false;
+        handleRecognition(result);
+      },
+      error => {
+        closeRecognizer();
+        assessmentInProgress = false;
+        resetRecorderUI();
+        Swal.fire({
+          icon: 'error',
+          title: 'วิเคราะห์เสียงไม่สำเร็จ',
+          text: String(error || 'เกิดข้อผิดพลาด')
+        });
+      }
+    );
+  } catch (error) {
+    closeRecognizer();
+    assessmentInProgress = false;
+    resetRecorderUI();
+    setMicIcon(false);
+    showError(error);
+  }
+}
+
+function handleRecognition(result) {
+  resetRecorderUI();
+
+  if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+    const p =
+      SpeechSDK.PronunciationAssessmentResult.fromResult(result);
+
+    const data = {
+      recognizedText: cleanRecognized(result.text),
+      accuracy: safeScore(p.accuracyScore),
+      fluency: safeScore(p.fluencyScore),
+      completeness: safeScore(p.completenessScore),
+      pronunciation: safeScore(p.pronunciationScore)
+    };
+
+    data.finalScore = round2(
+      data.accuracy * 0.85 +
+      data.pronunciation * 0.15
+    );
+
+    data.isLikelyCorrectWord =
+      data.accuracy >= 60;
+
+    showResult(data);
+    saveResult(data);
+    return;
+  }
+
+  if (result.reason === SpeechSDK.ResultReason.NoMatch) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'ไม่ได้ยินเสียงชัดเจน',
+      text: 'กรุณาเข้าใกล้ไมโครโฟนและอ่านอีกครั้ง'
+    });
+    return;
+  }
+
+  if (result.reason === SpeechSDK.ResultReason.Canceled) {
+    const detail =
+      SpeechSDK.CancellationDetails.fromResult(result);
+
+    Swal.fire({
+      icon: 'error',
+      title: 'การวิเคราะห์ถูกยกเลิก',
+      text:
+        detail.errorDetails ||
+        String(detail.reason || 'กรุณาลองใหม่')
+    });
+    return;
+  }
+
+  Swal.fire({
+    icon: 'warning',
+    title: 'ไม่สามารถอ่านผลเสียงได้',
+    text: 'กรุณาลองใหม่อีกครั้ง'
+  });
+}
+
+function showResult(data) {
+  const currentWord = words[currentIndex]?.word || '—';
+
+  Swal.fire({
+    title: 'ผลการอ่านออกเสียง',
+    width: 620,
+    allowOutsideClick: false,
+    confirmButtonText:
+      currentIndex === words.length - 1
+        ? 'ดูผลสรุป'
+        : 'คำถัดไป',
+    showDenyButton: currentAttempt < MAX_ATTEMPTS,
+    denyButtonText: 'อ่านอีกครั้ง',
+     reverseButtons: true,
+
+    html: `
+      <div class="popup-result">
+
+        <div class="popup-score">
+          ${Math.round(data.finalScore)}%
+        </div>
+
+        <div class="popup-status">
+          ${statusText(data.finalScore)}
+        </div>
+
+        <div class="popup-word">
+          คำที่ประเมิน:
+          <strong>${escapeHtml(currentWord)}</strong>
+        </div>
+
+        <div class="popup-score-grid">
+          <div>
+            <b>${Math.round(data.accuracy)}</b>
+            <span>ความถูกต้อง</span>
+          </div>
+
+          <div>
+            <b>${Math.round(data.pronunciation)}</b>
+            <span>การออกเสียง</span>
+          </div>
+
+          <div>
+            <b>${Math.round(data.fluency)}</b>
+            <span>ความคล่อง</span>
+          </div>
+
+          <div>
+            <b>${Math.round(data.completeness)}</b>
+            <span>ความครบถ้วน</span>
+          </div>
+        </div>
+
       </div>
-    </header>
+    `
+  }).then(result => {
+    if (result.isDenied) {
+      retryCurrentWord();
+      return;
+    }
 
-    <section id="loginView" class="card login-card">
-      <h2>เข้าสู่ระบบนักเรียน</h2>
-      <label for="studentId">รหัสนักศึกษา</label>
-      <input id="studentId" type="text" inputmode="numeric"
-             autocomplete="off" maxlength="20"
-             placeholder="กรอกรหัสนักศึกษา">
-      <button id="loginBtn" class="btn primary" onclick="login()">เข้าสู่ระบบ</button>
-      <p class="hint">รหัสทดลองเริ่มต้น: 6901000001</p>
-    </section>
+    if (result.isConfirmed) {
+      nextWord();
+    }
+  });
+}
+async function saveResult(data) {
+  const item = words[currentIndex];
 
-    <section id="testView" class="card hidden">
-      <div class="student-bar">
-        <div>
-          <span class="muted">ผู้ทดสอบ</span>
-          <strong id="studentName">—</strong>
-        </div>
-        <span id="studentLevel" class="level-pill"></span>
-      </div>
+  const payload = {
+    wordId: item.wordId,
+    referenceWord: item.word,
+    recognizedText: data.recognizedText,
+    accuracy: data.accuracy,
+    fluency: data.fluency,
+    completeness: data.completeness,
+    pronunciation: data.pronunciation,
+    attempt: currentAttempt
+  };
 
-      <div class="progress-track">
-        <div id="progressBar" class="progress-bar"></div>
-      </div>
+  try {
+    const result = await callApi('saveResult', {
+      sessionToken,
+      payload
+    });
 
-      <div id="counter" class="counter">คำที่ 1 จาก 10</div>
-      <div id="wordText" class="word">กรรมการ</div>
-      <div id="wordMeta" class="word-meta"></div>
+    if (result?.success) {
+      completedScores[currentIndex] =
+        Number(result.finalScore) || 0;
+    }
 
-<div class="mic-zone">
-<div
-  id="micCircle"
-  class="mic-circle"
-  onclick="startAssessment()"
->
-  <i id="micIcon" class="fa fa-microphone-slash"></i>
-</div>
-<button
-    id="recordBtn"
-    type="button"
-    disabled>
-    กดเพื่อเริ่มอ่าน
-</button>
+  } catch (error) {
+    console.error('บันทึกผลไม่สำเร็จ', error);
 
-  <div id="statusText" class="status">
-    เมื่อพร้อม ให้กดปุ่มแล้วอ่านคำที่แสดง
-  </div>
-</div>
-      <div id="resultBox" class="result-box hidden">
-        <div class="main-score">
-          <span id="finalScore">0%</span>
-          <small id="finalStatus">—</small>
-        </div>
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'warning',
+      title: 'แสดงผลได้ แต่บันทึกลงชีตไม่สำเร็จ',
+      timer: 3500,
+      showConfirmButton: false
+    });
+  }
+}
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+function retryCurrentWord() {
+  if (currentAttempt >= MAX_ATTEMPTS) {
+    Swal.fire({
+      icon: 'info',
+      title: 'อ่านครบจำนวนครั้งแล้ว',
+      text: `คำนี้อ่านได้สูงสุด ${MAX_ATTEMPTS} ครั้ง`
+    });
+    return;
+  }
+  currentAttempt++;
+  document.getElementById('resultBox').classList.add('hidden');
+  document.getElementById('statusText').textContent =
+    `ครั้งที่ ${currentAttempt} จาก ${MAX_ATTEMPTS}`;
+  setButton(document.getElementById('recordBtn'), false, 'กดเพื่ออ่านอีกครั้ง');
+}
 
-        <div class="heard">
-        คำที่ประเมิน:
-        <strong id="recognizedText">—</strong>
-        </div>
+function nextWord() {
+  if (currentIndex === words.length - 1) {
+    showSummary();
+    return;
+  }
+  currentIndex++;
+  currentAttempt = 1;
+  renderWord();
+}
 
-        <div class="score-grid">
-          <div><b id="accuracyScore">0</b><span>ความถูกต้อง</span></div>
-          <div><b id="pronunciationScore">0</b><span>การออกเสียง</span></div>
-          <div><b id="fluencyScore">0</b><span>ความคล่อง</span></div>
-          <div><b id="completenessScore">0</b><span>ความครบถ้วน</span></div>
-        </div>
+function showSummary() {
+  closeRecognizer();
+  showView('summaryView');
 
-        <div class="actions">
-          <button id="retryBtn" class="btn secondary"
-                  onclick="retryCurrentWord()">อ่านอีกครั้ง</button>
-          <button id="nextBtn" class="btn success"
-                  onclick="nextWord()">คำถัดไป</button>
-        </div>
-      </div>
-    </section>
+  const scores = completedScores.filter(Number.isFinite);
+  const average = scores.length
+    ? scores.reduce((sum, n) => sum + n, 0) / scores.length
+    : 0;
 
-    <div id="micTestArea" class="mic-test-area hidden">
-      <button
-        type="button"
-        class="mic-test-link"
-        onclick="testMicrophoneOnly()"
-      >
-        ทดสอบไมโครโฟน
-      </button>
-    </div>
+  document.getElementById('averageScore').textContent =
+    Math.round(average) + '%';
+}
 
-    <section id="summaryView" class="card summary hidden">
-      <div class="trophy">🏆</div>
-      <h2>ทำแบบทดสอบครบแล้ว</h2>
-      <p>คะแนนเฉลี่ยจากคำที่ทำเสร็จ</p>
-      <div id="averageScore" class="average">0%</div>
-      <button class="btn primary" onclick="restartTest()">ทดสอบอีกครั้ง</button>
-    </section>
-  </main>
+function restartTest() {
+  loadWords();
+}
 
- <script src="app.js"></script>
-</body>
-</html>
+function showView(id) {
+  ['loginView', 'testView', 'summaryView'].forEach(viewId => {
+    document
+      .getElementById(viewId)
+      .classList.toggle('hidden', viewId !== id);
+  });
+
+  const micTestArea =
+    document.getElementById('micTestArea');
+
+  if (micTestArea) {
+    micTestArea.classList.toggle(
+      'hidden',
+      id !== 'testView'
+    );
+  }
+}
+
+function resetRecorderUI() {
+  document.getElementById('micCircle').classList.remove('listening');
+  setMicIcon(false);
+
+  setButton(
+    document.getElementById('recordBtn'),
+    false,
+    'กดเพื่อเริ่มอ่าน'
+  );
+
+  document.getElementById('statusText').textContent =
+    'เมื่อพร้อม ให้กดปุ่มแล้วอ่านคำที่แสดง';
+}
+
+function closeRecognizer() {
+  if (!recognizer) return;
+
+  try {
+    recognizer.close();
+  } catch (e) {
+    console.error(e);
+  }
+
+  recognizer = null;
+
+  document.getElementById('micCircle').classList.remove('listening');
+  setMicIcon(false);
+}
+function setMicIcon(listening) {
+  const icon = document.getElementById("micIcon");
+  if (!icon) return;
+
+  if (listening) {
+    icon.className = "fa fa-microphone";
+  } else {
+    icon.className = "fa fa-microphone-slash";
+  }
+}
+function setButton(button, disabled, text) {
+  button.disabled = disabled;
+  button.textContent = text;
+}
+
+function cleanRecognized(text) {
+  return String(text || '').replace(/[.。!?！？,，]+$/g, '').trim();
+}
+
+function safeScore(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
+}
+
+function round2(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function statusText(score) {
+  if (score >= 90) return 'อ่านถูกต้องดีมาก';
+  if (score >= 80) return 'อ่านได้ดี';
+  if (score >= 70) return 'ผ่านเกณฑ์';
+  if (score >= 50) return 'ควรฝึกเพิ่มเติม';
+  return 'ควรอ่านใหม่';
+}
+
+function showError(error) {
+  const message = error?.message || String(error || 'เกิดข้อผิดพลาด');
+  Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: message });
+}
