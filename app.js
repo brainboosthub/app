@@ -146,49 +146,71 @@ showView('menuView');
   }
 }
 async function startArticleTest() {
+  const articleContent =
+    document.getElementById('articleContent');
+
+  if (!articleContent) {
+    Swal.fire({
+      icon: 'error',
+      title: 'ไม่พบส่วนบทความ',
+      text: 'ไม่พบ element id="articleContent" กรุณาตรวจสอบไฟล์ index.html'
+    });
+    return;
+  }
+
+  const targetElements =
+    articleContent.querySelectorAll('[data-target]');
+
+  console.log(
+    'จำนวนคำเป้าหมายที่พบ:',
+    targetElements.length
+  );
+
+  articleWords = Array.from(targetElements).map(
+    (element, index) => ({
+      articleWordId:
+        'A' + String(index + 1).padStart(3, '0'),
+
+      word: String(
+        element.getAttribute('data-target') ||
+        element.textContent ||
+        ''
+      ).trim(),
+
+      element
+    })
+  );
+
+  if (articleWords.length !== 20) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'จำนวนคำในบทความไม่ครบ',
+      html: `
+        พบคำเป้าหมาย
+        <b>${articleWords.length}</b> คำ
+        ต้องมีทั้งหมด <b>20</b> คำ
+        <br><br>
+        กรุณาตรวจสอบว่า GitHub Pages
+        โหลดไฟล์ index.html เวอร์ชันล่าสุด
+      `
+    });
+    return;
+  }
+
   document.getElementById('articleStudentName').textContent =
     student?.name || student?.studentId || '—';
 
   document.getElementById('articleStudentLevel').textContent =
     student?.level || '';
 
-  // นำคำเป้าหมายจาก span data-target ในบทความ
-  articleWords = Array.from(
-    document.querySelectorAll(
-      '#articleContent span[data-target]'
-    )
-  ).map((element, index) => ({
-    articleWordId:
-      'A' + String(index + 1).padStart(3, '0'),
-
-    word: String(
-      element.dataset.target ||
-      element.textContent ||
-      ''
-    ).trim(),
-
-    element
-  }));
-
-  if (articleWords.length !== 20) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'จำนวนคำในบทความไม่ครบ',
-      text:
-        'พบคำเป้าหมาย ' +
-        articleWords.length +
-        ' คำ ต้องมีทั้งหมด 20 คำ'
-    });
-
-    return;
-  }
-
-  currentArticleIndex = 0;
-  currentArticleAttempt = 1;
   articleSystemPoints = [];
+  articleRecognitionResults = [];
+  articleAssessmentInProgress = false;
 
   showView('articleView');
-  renderArticleWord();
+
+  document.getElementById('articleStatusText').textContent =
+    'กดไมโครโฟน แล้วอ่านบทความทั้งหมดจนจบ จากนั้นกด “หยุดและประเมินผล”';
 }
 async function startWordTest() {
   await loadWords();
