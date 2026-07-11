@@ -345,3 +345,115 @@ input:focus {
     padding: 11px 8px;
   }
 }
+.popup-result {
+  text-align: center;
+}
+
+/* คะแนนข้อนี้และคะแนนสะสม */
+.popup-point-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin: 4px 0 18px;
+}
+
+.popup-point-item {
+  text-align: center;
+}
+
+.popup-point-title {
+  display: block;
+  color: #222;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.popup-point-number {
+  display: block;
+  color: #119600;
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.popup-point-full {
+  display: block;
+  margin-top: 6px;
+  color: #718094;
+  font-size: 11px;
+}
+
+/* คำที่กำลังประเมิน */
+.popup-word {
+  padding: 13px 10px;
+  margin: 0 0 10px;
+  border-radius: 13px;
+  background: #f3f7fa;
+  color: #5d6772;
+  font-size: 16px;
+}
+
+.popup-word strong {
+  color: #303943;
+}
+
+/* เปอร์เซ็นต์อยู่ใต้คำ */
+.popup-score {
+  margin-top: 4px;
+  color: #16845f;
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 800;
+}
+
+.popup-status {
+  color: #718094;
+  font-size: 15px;
+  margin: 3px 0 17px;
+}
+
+/* รายละเอียด 4 ช่อง */
+.popup-score-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.popup-score-grid > div {
+  padding: 14px 6px;
+  border-radius: 13px;
+  background: #f3f7fa;
+  text-align: center;
+}
+
+.popup-score-grid b {
+  display: block;
+  color: #1472ad;
+  font-size: 23px;
+}
+
+.popup-score-grid span {
+  display: block;
+  margin-top: 4px;
+  color: #718094;
+  font-size: 11px;
+}
+
+@media (max-width: 480px) {
+  .popup-point-summary {
+    gap: 8px;
+  }
+
+  .popup-point-title {
+    font-size: 14px;
+  }
+
+  .popup-point-number {
+    font-size: 38px;
+  }
+
+  .popup-word {
+    font-size: 14px;
+  }
+}
