@@ -747,11 +747,11 @@ function calculatePoint(score) {
   }
 
   if (score >= 11) {
-    // 11% = 0.1 และ 39% = 0.9
+    // 6% = 0.1 และ 39% = 0.9
     const point =
-      0.1 + ((score - 11) * 0.8 / 28);
+      0.1 + ((score - 6) * 0.8 / 28);
 
-    return Math.round(point * 10) / 10;
+    return Math.round(point * 5) / 5;
   }
 
   return 0;
