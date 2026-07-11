@@ -683,10 +683,10 @@ function round2(value) {
 }
 
 function statusText(score) {
-  if (score >= 90) return 'อ่านถูกต้องดีมาก';
-  if (score >= 80) return 'อ่านได้ดี';
-  if (score >= 70) return 'ผ่านเกณฑ์';
-  if (score >= 50) return 'ควรฝึกเพิ่มเติม';
+  if (score >= 80) return 'อ่านได้ดีมากและอ่านคล่อง';
+  if (score >= 60) return 'อ่านได้ดี';
+  if (score >= 40) return 'อ่านได้แต่ไม่คล่อง';
+  if (score >= 20) return 'อ่านพอได้';
   return 'ควรอ่านใหม่';
 }
 
