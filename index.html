@@ -51,16 +51,20 @@
       <div id="wordMeta" class="word-meta"></div>
 
 <div class="mic-zone">
-<div id="micCircle" class="mic-circle">
-    <i id="micIcon" class="fa fa-microphone-slash"></i>
+<div
+  id="micCircle"
+  class="mic-circle"
+  onclick="startAssessment()"
+>
+  <i id="micIcon" class="fa fa-microphone-slash"></i>
 </div>
-  <button
+<button
     id="recordBtn"
     class="btn danger"
-    onclick="startAssessment()"
-  >
+    type="button"
+    disabled>
     กดเพื่อเริ่มอ่าน
-  </button>
+</button>
 
   <div id="statusText" class="status">
     เมื่อพร้อม ให้กดปุ่มแล้วอ่านคำที่แสดง
