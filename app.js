@@ -1,3 +1,5 @@
+const API_URL =
+  'https://script.google.com/macros/s/AKfycbyAvyBkU_vyyHwy5ekl3GIohGkA91WXL8sYIEmoaEEikGoWl7gr-OtUxfECO4fqia2Zfg/exec';
 const MAX_ATTEMPTS = 3;
 
 let sessionToken = '';
@@ -13,78 +15,81 @@ document.getElementById('studentId').addEventListener('keydown', event => {
   if (event.key === 'Enter') login();
 });
 
-function login() {
+async function login() {
   const id = document.getElementById('studentId').value.trim();
   const button = document.getElementById('loginBtn');
 
   if (!id) {
-    Swal.fire({ icon: 'warning', title: 'กรุณากรอกรหัสนักศึกษา' });
+    Swal.fire({
+      icon: 'warning',
+      title: 'กรุณากรอกรหัสนักศึกษา'
+    });
     return;
   }
 
   setButton(button, true, 'กำลังตรวจสอบ...');
 
-  google.script.run
-    .withSuccessHandler(result => {
-      setButton(button, false, 'เข้าสู่ระบบ');
+  try {
+    const result = await callApi('login', {
+      studentId: id
+    });
 
-      if (!result || !result.success) {
-        Swal.fire({
-          icon: 'error',
-          title: 'เข้าสู่ระบบไม่สำเร็จ',
-          text: result?.message || 'ไม่พบข้อมูลนักศึกษา'
-        });
-        return;
-      }
+    if (!result || !result.success) {
+      throw new Error(
+        result?.message || 'ไม่พบข้อมูลนักศึกษา'
+      );
+    }
 
-      sessionToken = result.sessionToken;
-      student = result;
-      document.getElementById('studentName').textContent =
-        result.name || result.studentId;
-      document.getElementById('studentLevel').textContent =
-        result.level || '';
+    sessionToken = result.sessionToken;
+    student = result;
 
-      loadWords();
-    })
-    .withFailureHandler(error => {
-      setButton(button, false, 'เข้าสู่ระบบ');
-      showError(error);
-    })
-    .loginStudent(id);
+    document.getElementById('studentName').textContent =
+      result.name || result.studentId;
+
+    document.getElementById('studentLevel').textContent =
+      result.level || '';
+
+    await loadWords();
+
+  } catch (error) {
+    showError(error);
+
+  } finally {
+    setButton(button, false, 'เข้าสู่ระบบ');
+  }
 }
-
-function loadWords() {
+async function loadWords() {
   Swal.fire({
     title: 'กำลังเตรียมแบบทดสอบ',
     allowOutsideClick: false,
     didOpen: () => Swal.showLoading()
   });
 
-  google.script.run
-    .withSuccessHandler(result => {
-      Swal.close();
-      words = Array.isArray(result) ? result : [];
+  try {
+    const result = await callApi('getWords', {
+      sessionToken
+    });
 
-      if (!words.length) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'ไม่พบคำทดสอบ',
-          text: 'กรุณาเพิ่มคำในชีต words'
-        });
-        return;
-      }
+    words = Array.isArray(result) ? result : [];
 
-      currentIndex = 0;
-      currentAttempt = 1;
-      completedScores = [];
-      showView('testView');
-      renderWord();
-    })
-    .withFailureHandler(error => {
-      Swal.close();
-      showError(error);
-    })
-    .getTestWords(sessionToken);
+    if (!words.length) {
+      throw new Error(
+        'ไม่พบคำทดสอบ กรุณาเพิ่มคำในชีต words'
+      );
+    }
+
+    currentIndex = 0;
+    currentAttempt = 1;
+    completedScores = [];
+
+    Swal.close();
+    showView('testView');
+    renderWord();
+
+  } catch (error) {
+    Swal.close();
+    showError(error);
+  }
 }
 
 function renderWord() {
@@ -168,7 +173,7 @@ async function startAssessment() {
       error.name === 'PermissionDeniedError'
     ) {
       message =
-        'Chrome ไม่อนุญาตให้หน้าเว็บนี้ใช้ไมโครโฟน กรุณาคลิกไอคอนด้านซ้ายของ URL แล้วตั้งค่าไมโครโฟนเป็น “อนุญาต” จากนั้นปิดแท็บและเปิด URL /exec ใหม่';
+        'Chrome ไม่อนุญาตให้หน้าเว็บนี้ใช้ไมโครโฟน กรุณาคลิกไอคอนด้านซ้ายของ URL แล้วตั้งค่าไมโครโฟนเป็น “อนุญาต” จากนั้นรีเฟรชหน้า GitHub Pages ใหม่';
     } else if (
       error.name === 'NotFoundError' ||
       error.name === 'DevicesNotFoundError'
@@ -214,14 +219,18 @@ async function startAssessment() {
   document.getElementById('statusText').textContent =
     'กำลังเชื่อมต่อระบบวิเคราะห์เสียง...';
 
-  google.script.run
-    .withSuccessHandler(auth => beginAzure(auth))
-    .withFailureHandler(error => {
-      assessmentInProgress = false;
-      resetRecorderUI();
-      showError(error);
-    })
-    .getAzureSpeechToken(sessionToken);
+try {
+  const auth = await callApi('getAzureToken', {
+    sessionToken
+  });
+
+  beginAzure(auth);
+
+} catch (error) {
+  assessmentInProgress = false;
+  resetRecorderUI();
+  showError(error);
+}
 }
 
 
@@ -386,8 +395,9 @@ function showResult(data) {
     'วิเคราะห์เสียงเรียบร้อยแล้ว';
 }
 
-function saveResult(data) {
+async function saveResult(data) {
   const item = words[currentIndex];
+
   const payload = {
     wordId: item.wordId,
     referenceWord: item.word,
@@ -399,26 +409,30 @@ function saveResult(data) {
     attempt: currentAttempt
   };
 
-  google.script.run
-    .withSuccessHandler(result => {
-      if (result?.success) {
-        completedScores[currentIndex] = Number(result.finalScore) || 0;
-      }
-    })
-    .withFailureHandler(error => {
-      console.error('บันทึกผลไม่สำเร็จ', error);
-      Swal.fire({
-        toast: true,
-        position: 'top-end',
-        icon: 'warning',
-        title: 'แสดงผลได้ แต่บันทึกลงชีตไม่สำเร็จ',
-        timer: 3500,
-        showConfirmButton: false
-      });
-    })
-    .savePronunciationResult(sessionToken, payload);
-}
+  try {
+    const result = await callApi('saveResult', {
+      sessionToken,
+      payload
+    });
 
+    if (result?.success) {
+      completedScores[currentIndex] =
+        Number(result.finalScore) || 0;
+    }
+
+  } catch (error) {
+    console.error('บันทึกผลไม่สำเร็จ', error);
+
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'warning',
+      title: 'แสดงผลได้ แต่บันทึกลงชีตไม่สำเร็จ',
+      timer: 3500,
+      showConfirmButton: false
+    });
+  }
+}
 function retryCurrentWord() {
   if (currentAttempt >= MAX_ATTEMPTS) {
     Swal.fire({
@@ -508,4 +522,70 @@ function statusText(score) {
 function showError(error) {
   const message = error?.message || String(error || 'เกิดข้อผิดพลาด');
   Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: message });
+}
+function callApi(action, data = {}) {
+  return new Promise((resolve, reject) => {
+    const callbackName =
+      'jsonpCallback_' +
+      Date.now() +
+      '_' +
+      Math.floor(Math.random() * 100000);
+
+    const params = new URLSearchParams({
+      action,
+      callback: callbackName
+    });
+
+    Object.keys(data).forEach(key => {
+      const value = data[key];
+
+      params.set(
+        key,
+        typeof value === 'object'
+          ? JSON.stringify(value)
+          : String(value)
+      );
+    });
+
+    const script = document.createElement('script');
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('เชื่อมต่อระบบหลังบ้านหมดเวลา'));
+    }, 20000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      script.remove();
+      delete window[callbackName];
+    }
+
+    window[callbackName] = response => {
+      cleanup();
+
+      if (!response || !response.success) {
+        reject(
+          new Error(
+            response?.message ||
+            'ระบบหลังบ้านตอบกลับไม่สำเร็จ'
+          )
+        );
+        return;
+      }
+
+      resolve(response.data);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(
+        new Error('ไม่สามารถเชื่อมต่อ Google Apps Script')
+      );
+    };
+
+    script.src =
+      API_URL + '?' + params.toString();
+
+    document.body.appendChild(script);
+  });
 }
