@@ -75,6 +75,9 @@ let words = [];
 let currentIndex = 0;
 let currentAttempt = 1;
 let completedScores = [];
+let accumulatedPoints = [];
+
+const MAX_ACCUMULATED_SCORE = 40;
 let recognizer = null;
 let assessmentInProgress = false;
 
@@ -149,6 +152,7 @@ async function loadWords() {
     currentIndex = 0;
     currentAttempt = 1;
     completedScores = [];
+    accumulatedPoints = [];
 
     Swal.close();
     showView('testView');
@@ -406,16 +410,24 @@ function handleRecognition(result) {
       pronunciation: safeScore(p.pronunciationScore)
     };
 
-    data.finalScore = round2(
-      data.accuracy * 0.85 +
-      data.pronunciation * 0.15
-    );
+data.finalScore = round2(
+  data.accuracy * 0.85 +
+  data.pronunciation * 0.15
+);
 
-    data.isLikelyCorrectWord =
-      data.accuracy >= 60;
+data.point = calculatePoint(data.finalScore);
 
-    showResult(data);
-    saveResult(data);
+accumulatedPoints[currentIndex] =
+  data.point;
+
+data.accumulatedPoint =
+  getAccumulatedPoint();
+
+data.isLikelyCorrectWord =
+  data.accuracy >= 60;
+
+showResult(data);
+saveResult(data);
     return;
   }
 
@@ -475,7 +487,20 @@ confirmButtonText:
         <div class="popup-status">
           ${statusText(data.finalScore)}
         </div>
+<div class="popup-point-summary">
+  <div class="popup-current-point">
+    <b>${formatPoint(data.point)}</b>
+    <span>คะแนนข้อนี้</span>
+  </div>
 
+  <div class="popup-accumulated-point">
+    <b>
+      ${formatPoint(data.accumulatedPoint)}
+      <small>/ ${MAX_ACCUMULATED_SCORE}</small>
+    </b>
+    <span>คะแนนสะสม</span>
+  </div>
+</div>
         <div class="popup-word">
           คำที่ประเมิน:
           <strong>${escapeHtml(currentWord)}</strong>
@@ -530,6 +555,11 @@ async function saveResult(data) {
     fluency: data.fluency,
     completeness: data.completeness,
     pronunciation: data.pronunciation,
+
+    point: data.point,
+    accumulatedPoint: data.accumulatedPoint,
+    fullPoint: MAX_ACCUMULATED_SCORE,
+
     attempt: currentAttempt
   };
 
@@ -681,12 +711,55 @@ function safeScore(value) {
 function round2(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
+function calculatePoint(score) {
+  score = Number(score) || 0;
 
+  if (score >= 70) {
+    return 2;
+  }
+
+  if (score >= 41) {
+    // 41% = 1.1 และ 69% = 1.9
+    const point =
+      1.1 + ((score - 41) * 0.8 / 28);
+
+    return Math.round(point * 10) / 10;
+  }
+
+  if (score >= 40) {
+    return 1;
+  }
+
+  if (score >= 11) {
+    // 11% = 0.1 และ 39% = 0.9
+    const point =
+      0.1 + ((score - 11) * 0.8 / 28);
+
+    return Math.round(point * 10) / 10;
+  }
+
+  return 0;
+}
+
+function getAccumulatedPoint() {
+  return accumulatedPoints.reduce(
+    (total, point) => total + (Number(point) || 0),
+    0
+  );
+}
+
+function formatPoint(value) {
+  const number = Number(value) || 0;
+
+  return Number.isInteger(number)
+    ? String(number)
+    : number.toFixed(1);
+}
 function statusText(score) {
-  if (score >= 80) return 'อ่านได้ดีมากและอ่านคล่อง';
-  if (score >= 60) return 'อ่านได้ดี';
-  if (score >= 40) return 'อ่านได้แต่ไม่คล่อง';
-  if (score >= 20) return 'อ่านพอได้';
+  if (score >= 90) return 'อ่านถูกต้องดีมาก';
+  if (score >= 80) return 'อ่านได้ดี';
+  if (score >= 70) return 'ผ่านเกณฑ์';
+  if (score >= 50) return 'ควรฝึกเพิ่มเติม';
   return 'ควรอ่านใหม่';
 }
 
