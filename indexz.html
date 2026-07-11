@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <base target="_top">
   <meta charset="UTF-8">
   <meta name="viewport"
         content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -32,7 +31,40 @@
       <button id="loginBtn" class="btn primary" onclick="login()">เข้าสู่ระบบ</button>
       <p class="hint">รหัสทดลองเริ่มต้น: 6901000001</p>
     </section>
+<section id="menuView" class="card hidden">
+  <div class="student-bar">
+    <div>
+      <span class="muted">ผู้ทดสอบ</span>
+      <strong id="menuStudentName">—</strong>
+    </div>
 
+    <span class="level-pill">
+      เลือกแบบทดสอบ
+    </span>
+  </div>
+
+  <h2 style="text-align:center;">
+    เลือกระบบทดสอบ
+  </h2>
+
+  <button
+    type="button"
+    class="btn primary test-menu-btn"
+    onclick="startWordTest()"
+  >
+    อ่านคำ 20 คำ
+    <small>คะแนนเต็ม 40 คะแนน</small>
+  </button>
+
+  <button
+    type="button"
+    class="btn success test-menu-btn"
+    onclick="startArticleTest()"
+  >
+    อ่านบทความ กากับเหยือกน้ำ
+    <small>คะแนนเต็ม 60 คะแนน</small>
+  </button>
+</section>
     <section id="testView" class="card hidden">
       <div class="student-bar">
         <div>
@@ -46,7 +78,7 @@
         <div id="progressBar" class="progress-bar"></div>
       </div>
 
-      <div id="counter" class="counter">คำที่ 1 จาก 10</div>
+<div id="counter" class="counter">คำที่ 1 จาก 20</div>
       <div id="wordText" class="word">กรรมการ</div>
       <div id="wordMeta" class="word-meta"></div>
 
@@ -59,15 +91,16 @@
   <i id="micIcon" class="fa fa-microphone-slash"></i>
 </div>
 <button
-    id="recordBtn"
-    type="button"
-    disabled>
-    กดเพื่อเริ่มอ่าน
+  id="recordBtn"
+  type="button"
+  disabled
+>
+  กดไมโครโฟนเพื่อเริ่มอ่าน
 </button>
 
-  <div id="statusText" class="status">
-    เมื่อพร้อม ให้กดปุ่มแล้วอ่านคำที่แสดง
-  </div>
+<div id="statusText" class="status">
+  เมื่อพร้อม ให้กดไมโครโฟนแล้วอ่านคำที่แสดง
+</div>
 </div>
       <div id="resultBox" class="result-box hidden">
         <div class="main-score">
@@ -95,7 +128,97 @@
         </div>
       </div>
     </section>
+<section id="articleView" class="card hidden">
+  <div class="student-bar">
+    <div>
+      <span class="muted">ผู้ทดสอบ</span>
+      <strong id="articleStudentName">—</strong>
+    </div>
 
+<span
+    id="articleStudentLevel"
+    class="level-pill">
+</span>
+  </div>
+
+  <div class="progress-track">
+    <div id="articleProgressBar" class="progress-bar"></div>
+  </div>
+
+  <div id="articleCounter" class="counter">
+    คำที่ 1 จาก 20
+  </div>
+
+  <h2 class="article-title">กากับเหยือกน้ำ</h2>
+
+<div id="articleContent" class="article-content">
+  กาฝูงหนึ่ง วันหนึ่งใน
+  <span data-target="ฤดูร้อน">ฤดูร้อน</span>
+  ที่มีอากาศร้อนจัด
+  <span data-target="พระอาทิตย์">พระอาทิตย์</span>
+  ได้ส่องแสง
+  <span data-target="แผดเผา">แผดเผา</span>
+  ไปทั่วทุกหนทุกแห่ง น้ำใน
+  <span data-target="ห้วย">ห้วย</span>
+  หนอง คลอง
+  <span data-target="บึง">บึง</span>
+  จึง
+  <span data-target="แห้งผาก">แห้งผาก</span>
+  จนไม่มีน้ำหลงเหลืออยู่เลย
+
+  กาตัวหนึ่งได้พยายามบินหา
+  <span data-target="น้ำดื่ม">น้ำดื่ม</span>
+  ด้วยความ
+  <span data-target="กระหายน้ำ">กระหายน้ำ</span>
+  ไปทั่วทุกหนทุกแห่ง
+  <span data-target="จนกระทั่ง">จนกระทั่ง</span>
+  บินมาถึง
+  <span data-target="บ่อน้ำ">บ่อน้ำ</span>
+  แห่งหนึ่ง และเห็น
+  <span data-target="เหยือกน้ำ">เหยือกน้ำ</span>
+  ขนาดใหญ่ใบหนึ่งตั้งอยู่ ที่ก้นของเหยือกมี
+  <span data-target="น้ำขัง">น้ำขัง</span>
+  อยู่เล็กน้อย แต่กาก็ไม่
+  <span data-target="สามารถ">สามารถ</span>
+  ดื่มน้ำได้ เพราะ
+  <span data-target="ปากยื่น">ปากยื่น</span>
+  ของมันไม่ถึงน้ำ
+
+  กาจึงรู้สึก
+  <span data-target="โมโห">โมโห</span>
+  และ
+  <span data-target="หิวน้ำ">หิวน้ำ</span>
+  มาก จึงคิดหาวิธีแก้ปัญหา มันคาบ
+  <span data-target="ก้อนหิน">ก้อนหิน</span>
+  โยนใส่เหยือกน้ำ และ
+  <span data-target="สังเกต">สังเกต</span>
+  เห็นว่าน้ำในเหยือกค่อย ๆ สูงขึ้นมา ดังนั้นจึง
+  <span data-target="พยายาม">พยายาม</span>
+  คาบก้อนหินใส่ลงในเหยือกน้ำจนระดับน้ำสูงขึ้นมา และสามารถ
+  <span data-target="กินน้ำ">กินน้ำ</span>
+  จนอิ่ม
+</div>
+
+  <div class="article-current-word">
+    คำที่ต้องอ่าน:
+    <strong id="articleTargetWord">ฤดูร้อน</strong>
+  </div>
+
+  <div
+    id="articleMicCircle"
+    class="mic-circle"
+    onclick="startArticleAssessment()"
+  >
+    <i
+      id="articleMicIcon"
+      class="fa fa-microphone-slash"
+    ></i>
+  </div>
+
+  <div id="articleStatusText" class="status">
+    กดไมโครโฟนแล้วอ่านคำที่เน้น
+  </div>
+</section>
     <div id="micTestArea" class="mic-test-area hidden">
       <button
         type="button"
@@ -109,9 +232,11 @@
     <section id="summaryView" class="card summary hidden">
       <div class="trophy">🏆</div>
       <h2>ทำแบบทดสอบครบแล้ว</h2>
-      <p>คะแนนเฉลี่ยจากคำที่ทำเสร็จ</p>
-      <div id="averageScore" class="average">0%</div>
-      <button class="btn primary" onclick="restartTest()">ทดสอบอีกครั้ง</button>
+<p>สรุปคะแนนการอ่านออกเสียง</p>
+<div id="averageScore" class="average">0 / 100 คะแนน</div>
+     <button class="btn primary" onclick="showView('menuView')">
+  กลับหน้าเลือกแบบทดสอบ
+</button>
     </section>
   </main>
 
