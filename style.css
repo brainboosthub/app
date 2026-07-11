@@ -207,3 +207,35 @@ input:focus {
     cursor:default;
     pointer-events:none;
 }
+/* แสดง recordBtn เป็นข้อความสถานะ */
+#recordBtn{
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+
+    color: #000 !important;
+    font-size: 18px;
+    font-weight: 600;
+
+    padding: 6px 0;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* เมื่อ disabled ให้ยังเป็นสีดำ */
+#recordBtn:disabled{
+    opacity: 1 !important;
+    color: #000 !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+/* ไม่มีเอฟเฟกต์ Hover */
+#recordBtn:hover,
+#recordBtn:focus,
+#recordBtn:active{
+    background: transparent !important;
+    color: #000 !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
