@@ -189,3 +189,21 @@ input:focus {
   color: #1477bd;
   text-decoration: underline;
 }
+.mic-circle{
+    cursor:pointer;
+    transition:.25s;
+}
+
+.mic-circle:hover{
+    transform:scale(1.06);
+}
+
+.mic-circle:active{
+    transform:scale(.95);
+}
+
+#recordBtn:disabled{
+    opacity:1;
+    cursor:default;
+    pointer-events:none;
+}
