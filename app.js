@@ -450,37 +450,70 @@ function handleRecognition(result) {
 }
 
 function showResult(data) {
-document.getElementById('recognizedText').textContent =
-  words[currentIndex]?.word || 'ไม่พบคำ';
-  document.getElementById('accuracyScore').textContent =
-    Math.round(data.accuracy);
-  document.getElementById('fluencyScore').textContent =
-    Math.round(data.fluency);
-  document.getElementById('completenessScore').textContent =
-    Math.round(data.completeness);
-  document.getElementById('pronunciationScore').textContent =
-    Math.round(data.pronunciation);
-  document.getElementById('finalScore').textContent =
-    Math.round(data.finalScore) + '%';
-  document.getElementById('finalStatus').textContent =
-    statusText(data.finalScore);
+  const currentWord = words[currentIndex]?.word || '—';
 
-  document.getElementById('retryBtn').disabled =
-    currentAttempt >= MAX_ATTEMPTS;
-  document.getElementById('nextBtn').textContent =
-    currentIndex === words.length - 1 ? 'ดูผลสรุป' : 'คำถัดไป';
-  document.getElementById('resultBox').classList.remove('hidden');
-  document.getElementById('statusText').textContent =
-    'วิเคราะห์เสียงเรียบร้อยแล้ว';
-    const heardBox = document.getElementById('recognizedText');
+  Swal.fire({
+    title: 'ผลการอ่านออกเสียง',
+    width: 620,
+    allowOutsideClick: false,
+    confirmButtonText:
+      currentIndex === words.length - 1
+        ? 'ดูผลสรุป'
+        : 'คำถัดไป',
+    showDenyButton: currentAttempt < MAX_ATTEMPTS,
+    denyButtonText: 'อ่านอีกครั้ง',
 
-if (data.accuracy >= 60) {
-  heardBox.textContent = words[currentIndex]?.word || '—';
-} else {
-  heardBox.textContent = 'เสียงไม่ตรงกับคำที่กำหนด';
+    html: `
+      <div class="popup-result">
+
+        <div class="popup-score">
+          ${Math.round(data.finalScore)}%
+        </div>
+
+        <div class="popup-status">
+          ${statusText(data.finalScore)}
+        </div>
+
+        <div class="popup-word">
+          คำที่ประเมิน:
+          <strong>${escapeHtml(currentWord)}</strong>
+        </div>
+
+        <div class="popup-score-grid">
+          <div>
+            <b>${Math.round(data.accuracy)}</b>
+            <span>ความถูกต้อง</span>
+          </div>
+
+          <div>
+            <b>${Math.round(data.pronunciation)}</b>
+            <span>การออกเสียง</span>
+          </div>
+
+          <div>
+            <b>${Math.round(data.fluency)}</b>
+            <span>ความคล่อง</span>
+          </div>
+
+          <div>
+            <b>${Math.round(data.completeness)}</b>
+            <span>ความครบถ้วน</span>
+          </div>
+        </div>
+
+      </div>
+    `
+  }).then(result => {
+    if (result.isDenied) {
+      retryCurrentWord();
+      return;
+    }
+
+    if (result.isConfirmed) {
+      nextWord();
+    }
+  });
 }
-}
-
 async function saveResult(data) {
   const item = words[currentIndex];
 
@@ -518,6 +551,14 @@ async function saveResult(data) {
       showConfirmButton: false
     });
   }
+}
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 function retryCurrentWord() {
   if (currentAttempt >= MAX_ATTEMPTS) {
