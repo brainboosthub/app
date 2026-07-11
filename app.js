@@ -119,6 +119,7 @@ async function login() {
     await loadWords();
 
   } catch (error) {
+    setMicIcon(false);
     showError(error);
 
   } finally {
@@ -155,6 +156,7 @@ async function loadWords() {
 
   } catch (error) {
     Swal.close();
+    setMicIcon(false);
     showError(error);
   }
 }
@@ -296,6 +298,7 @@ try {
 } catch (error) {
   assessmentInProgress = false;
   resetRecorderUI();
+  setMicIcon(false);
   showError(error);
 }
 }
@@ -356,7 +359,7 @@ function beginAzure(auth) {
     );
     config.applyTo(recognizer);
 
-    document.getElementById('micCircle').classList.add('listening');
+  document.getElementById('micCircle').classList.add('listening');
 setMicIcon(true);
     setButton(document.getElementById('recordBtn'), true, 'กำลังฟังเสียง...');
     document.getElementById('statusText').textContent =
@@ -383,6 +386,7 @@ setMicIcon(true);
     closeRecognizer();
     assessmentInProgress = false;
     resetRecorderUI();
+    setMicIcon(false);
     showError(error);
   }
 }
@@ -578,24 +582,40 @@ function showView(id) {
 
 function resetRecorderUI() {
   document.getElementById('micCircle').classList.remove('listening');
-setMicIcon(false);
-  setButton(document.getElementById('recordBtn'), false, 'กดเพื่อเริ่มอ่าน');
+  setMicIcon(false);
+
+  setButton(
+    document.getElementById('recordBtn'),
+    false,
+    'กดเพื่อเริ่มอ่าน'
+  );
+
+  document.getElementById('statusText').textContent =
+    'เมื่อพร้อม ให้กดปุ่มแล้วอ่านคำที่แสดง';
 }
 
 function closeRecognizer() {
   if (!recognizer) return;
-  try { recognizer.close(); } catch (e) { console.error(e); }
+
+  try {
+    recognizer.close();
+  } catch (e) {
+    console.error(e);
+  }
+
   recognizer = null;
+
+  document.getElementById('micCircle').classList.remove('listening');
   setMicIcon(false);
 }
-function setMicIcon(listening = false) {
-  const icon = document.getElementById('micIcon');
+function setMicIcon(listening) {
+  const icon = document.getElementById("micIcon");
   if (!icon) return;
 
   if (listening) {
-    icon.className = 'fa fa-microphone';
+    icon.className = "fa fa-microphone";
   } else {
-    icon.className = 'fa fa-microphone-slash';
+    icon.className = "fa fa-microphone-slash";
   }
 }
 function setButton(button, disabled, text) {
