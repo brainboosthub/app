@@ -390,7 +390,8 @@ function handleRecognition(result) {
   resetRecorderUI();
 
   if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
-    const p = SpeechSDK.PronunciationAssessmentResult.fromResult(result);
+    const p =
+      SpeechSDK.PronunciationAssessmentResult.fromResult(result);
 
     const data = {
       recognizedText: cleanRecognized(result.text),
@@ -401,10 +402,12 @@ function handleRecognition(result) {
     };
 
     data.finalScore = round2(
-      data.accuracy * .70 +
-      data.pronunciation * .20 +
-      data.completeness * .10
+      data.accuracy * 0.85 +
+      data.pronunciation * 0.15
     );
+
+    data.isLikelyCorrectWord =
+      data.accuracy >= 60;
 
     showResult(data);
     saveResult(data);
@@ -421,11 +424,15 @@ function handleRecognition(result) {
   }
 
   if (result.reason === SpeechSDK.ResultReason.Canceled) {
-    const detail = SpeechSDK.CancellationDetails.fromResult(result);
+    const detail =
+      SpeechSDK.CancellationDetails.fromResult(result);
+
     Swal.fire({
       icon: 'error',
       title: 'การวิเคราะห์ถูกยกเลิก',
-      text: detail.errorDetails || String(detail.reason || 'กรุณาลองใหม่')
+      text:
+        detail.errorDetails ||
+        String(detail.reason || 'กรุณาลองใหม่')
     });
     return;
   }
@@ -438,8 +445,8 @@ function handleRecognition(result) {
 }
 
 function showResult(data) {
-  document.getElementById('recognizedText').textContent =
-    data.recognizedText || 'ไม่พบข้อความ';
+document.getElementById('recognizedText').textContent =
+  words[currentIndex]?.word || 'ไม่พบคำ';
   document.getElementById('accuracyScore').textContent =
     Math.round(data.accuracy);
   document.getElementById('fluencyScore').textContent =
@@ -460,6 +467,13 @@ function showResult(data) {
   document.getElementById('resultBox').classList.remove('hidden');
   document.getElementById('statusText').textContent =
     'วิเคราะห์เสียงเรียบร้อยแล้ว';
+    const heardBox = document.getElementById('recognizedText');
+
+if (data.accuracy >= 60) {
+  heardBox.textContent = words[currentIndex]?.word || '—';
+} else {
+  heardBox.textContent = 'เสียงไม่ตรงกับคำที่กำหนด';
+}
 }
 
 async function saveResult(data) {
