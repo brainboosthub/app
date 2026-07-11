@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ระบบทดสอบการอ่านออกเสียงภาษาไทย</title>
+
+  <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="hero-icon">ก</div>
+      <div>
+        <h1>ทดสอบการอ่านออกเสียงภาษาไทย</h1>
+        <p>อ่านข้อความทีละคำให้ชัดเจน แล้วระบบจะประเมินผลให้ทันที</p>
+      </div>
+    </header>
+
+    <section id="loginView" class="card login-card">
+      <h2>เข้าสู่ระบบนักเรียน</h2>
+      <label for="studentId">รหัสนักศึกษา</label>
+      <input id="studentId" type="text" inputmode="numeric"
+             autocomplete="off" maxlength="20"
+             placeholder="กรอกรหัสนักศึกษา">
+      <button id="loginBtn" class="btn primary" onclick="login()">เข้าสู่ระบบ</button>
+      <p class="hint">รหัสทดลองเริ่มต้น: 6901000001</p>
+    </section>
+
+    <section id="testView" class="card hidden">
+      <div class="student-bar">
+        <div>
+          <span class="muted">ผู้ทดสอบ</span>
+          <strong id="studentName">—</strong>
+        </div>
+        <span id="studentLevel" class="level-pill"></span>
+      </div>
+
+      <div class="progress-track">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+
+      <div id="counter" class="counter">คำที่ 1 จาก 10</div>
+      <div id="wordText" class="word">กรรมการ</div>
+      <div id="wordMeta" class="word-meta"></div>
+
+      <div class="mic-zone">
+        <div id="micCircle" class="mic-circle">🎤</div>
+        <button id="recordBtn" class="btn danger" onclick="startAssessment()">
+          กดเพื่อเริ่มอ่าน
+        </button>
+        <button
+  type="button"
+  class="btn secondary"
+  style="margin-top:10px;"
+  onclick="testMicrophoneOnly()"
+>
+  ทดสอบไมโครโฟน
+</button>
+        <div id="statusText" class="status">
+          เมื่อพร้อม ให้กดปุ่มแล้วอ่านคำที่แสดง
+        </div>
+      </div>
+
+      <div id="resultBox" class="result-box hidden">
+        <div class="main-score">
+          <span id="finalScore">0%</span>
+          <small id="finalStatus">—</small>
+        </div>
+
+        <div class="heard">
+          ระบบได้ยิน: <strong id="recognizedText">—</strong>
+        </div>
+
+        <div class="score-grid">
+          <div><b id="accuracyScore">0</b><span>ความถูกต้อง</span></div>
+          <div><b id="pronunciationScore">0</b><span>การออกเสียง</span></div>
+          <div><b id="fluencyScore">0</b><span>ความคล่อง</span></div>
+          <div><b id="completenessScore">0</b><span>ความครบถ้วน</span></div>
+        </div>
+
+        <div class="actions">
+          <button id="retryBtn" class="btn secondary"
+                  onclick="retryCurrentWord()">อ่านอีกครั้ง</button>
+          <button id="nextBtn" class="btn success"
+                  onclick="nextWord()">คำถัดไป</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="summaryView" class="card summary hidden">
+      <div class="trophy">🏆</div>
+      <h2>ทำแบบทดสอบครบแล้ว</h2>
+      <p>คะแนนเฉลี่ยจากคำที่ทำเสร็จ</p>
+      <div id="averageScore" class="average">0%</div>
+      <button class="btn primary" onclick="restartTest()">ทดสอบอีกครั้ง</button>
+    </section>
+  </main>
+
+ <script src="app.js"></script>
+</body>
+</html>
