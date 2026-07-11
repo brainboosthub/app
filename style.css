@@ -1,4 +1,3 @@
-<style>
 :root {
   --primary: #1477bd;
   --success: #12845e;
@@ -166,4 +165,3 @@ input:focus {
   .score-grid { grid-template-columns: repeat(2,1fr); }
   .student-bar { align-items: flex-start; }
 }
-</style>
