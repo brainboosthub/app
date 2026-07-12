@@ -1246,8 +1246,33 @@ function resetArticleWordHighlight() {
   });
 }
 function getSpokenArticleWords(text) {
-  return String(text || '')
+  const source = String(text || '')
     .normalize('NFC')
+    .trim();
+
+  if (!source) return [];
+
+  if (
+    typeof Intl !== 'undefined' &&
+    typeof Intl.Segmenter === 'function'
+  ) {
+    const segmenter =
+      new Intl.Segmenter('th', {
+        granularity: 'word'
+      });
+
+    return Array.from(
+      segmenter.segment(source)
+    )
+      .filter(item => item.isWordLike)
+      .map(item =>
+        normalizeThaiWord(item.segment)
+      )
+      .filter(Boolean);
+  }
+
+  // สำหรับเบราว์เซอร์รุ่นเก่า
+  return source
     .split(/\s+/)
     .map(normalizeThaiWord)
     .filter(Boolean);
