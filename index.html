@@ -32,7 +32,7 @@
       <button id="loginBtn" class="btn primary" onclick="login()">เข้าสู่ระบบ</button>
       <p class="hint">รหัสทดลองเริ่มต้น: 6901000001</p>
     </section>
-<section id="menuView" class="card hidden">
+<section id="menuView" class="card menu-view hidden">
 
   <div class="student-bar">
     <div>
@@ -45,82 +45,45 @@
     </span>
   </div>
 
-  <div class="menu-header">
+  <div class="menu-title-area">
+    <h2>อ่านออกเสียง</h2>
 
-    <h1>
-      อ่านออกเสียง
-    </h1>
+    <div class="menu-total-score">
+      คะแนนเต็ม 100 คะแนน
+    </div>
 
-    <h2>
-      คะแนนเต็ม
-      <span>100</span>
-      คะแนน
-    </h2>
-
-    <p>
-      เลือกระบบที่ต้องการทดสอบ
-    </p>
-
+    <p>เลือกระบบทดสอบ</p>
   </div>
 
-  <div class="menu-grid">
+  <div class="test-menu-list">
 
-    <div
-      class="test-card word-card"
+    <button
+      type="button"
+      class="test-menu-card word-test-card"
       onclick="startWordTest()"
     >
+      <span class="test-menu-main">
+        อ่านคำ 20 คำ
+      </span>
 
-      <div class="test-icon">
-        📖
-      </div>
-
-      <div class="test-title">
-        อ่านคำ
-      </div>
-
-      <div class="test-count">
-        20 คำ
-      </div>
-
-      <div class="test-score">
+      <span class="test-menu-score">
         40 คะแนน
-      </div>
+      </span>
+    </button>
 
-      <div class="test-desc">
-        อ่านทีละคำ
-        วิเคราะห์การออกเสียงทันที
-      </div>
-
-    </div>
-
-
-    <div
-      class="test-card article-card"
+    <button
+      type="button"
+      class="test-menu-card article-test-card"
       onclick="startArticleTest()"
     >
-
-      <div class="test-icon">
-        📄
-      </div>
-
-      <div class="test-title">
+      <span class="test-menu-main">
         อ่านบทความ
-      </div>
+      </span>
 
-      <div class="test-count">
-        กากับเหยือกน้ำ
-      </div>
-
-      <div class="test-score">
+      <span class="test-menu-score">
         60 คะแนน
-      </div>
-
-      <div class="test-desc">
-        อ่านบทความต่อเนื่อง
-        วิเคราะห์คำสำคัญ 20 คำ
-      </div>
-
-    </div>
+      </span>
+    </button>
 
   </div>
 
