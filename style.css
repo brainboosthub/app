@@ -159,7 +159,12 @@ input:focus {
 .summary { text-align: center; }
 .trophy { font-size: 70px; }
 .summary h2 { color: var(--success); }
-.average { margin: 18px 0; font-size: 48px; font-weight: 850; color: #196da5; }
+.average {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+}
 @media (max-width: 600px) {
   .page { width: min(100% - 16px, 780px); padding-top: 12px; }
   .hero { align-items: flex-start; }
@@ -803,5 +808,257 @@ font-size:34px;
 
   .test-menu-score {
     font-size: 28px;
+  }
+}
+/* =========================================================
+   หน้าสรุปผลรูปแบบใหม่
+========================================================= */
+
+.summary-modern {
+  width: 100%;
+  max-width: 720px;
+  min-height: 650px;
+  margin: 0 auto;
+  padding: 38px 28px 34px;
+  border-radius: 28px;
+  text-align: center;
+  background: #ffffff;
+  box-shadow:
+    0 20px 45px rgba(45, 75, 105, 0.12);
+}
+
+.summary-trophy {
+  margin-bottom: 16px;
+  font-size: 82px;
+  line-height: 1;
+}
+
+.summary-title {
+  margin: 0;
+  color: #278968;
+  font-size: clamp(28px, 5vw, 42px);
+  line-height: 1.25;
+  font-weight: 800;
+}
+
+.summary-subtitle {
+  margin: 26px 0 42px;
+  color: #172033;
+  font-size: clamp(18px, 3vw, 25px);
+  font-weight: 500;
+}
+
+.summary-score-area {
+  width: 100%;
+}
+
+.summary-score-list {
+  width: min(100%, 570px);
+  margin: 0 auto 38px;
+}
+
+.summary-score-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 10px;
+  color: #111827;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.summary-score-row:last-child {
+  border-bottom: 0;
+}
+
+.summary-score-label {
+  text-align: left;
+  font-size: clamp(28px, 5vw, 46px);
+  line-height: 1.2;
+  font-weight: 500;
+}
+
+.summary-score-value {
+  white-space: nowrap;
+  text-align: right;
+  font-size: clamp(30px, 5.5vw, 50px);
+  line-height: 1.1;
+  font-weight: 600;
+}
+
+.summary-score-value small {
+  font-size: 0.72em;
+  font-weight: 500;
+}
+
+.summary-grand-total {
+  width: min(100%, 610px);
+  min-height: 86px;
+  margin: 0 auto 70px;
+  padding: 15px 22px;
+
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 18px;
+
+  color: #ffffff;
+  background: #197fc1;
+  border-radius: 14px;
+
+  box-shadow:
+    0 12px 24px rgba(25, 127, 193, 0.2);
+}
+
+.summary-grand-total > span {
+  font-size: clamp(23px, 4vw, 34px);
+  font-weight: 500;
+}
+
+.summary-grand-total strong {
+  font-size: clamp(32px, 6vw, 51px);
+  line-height: 1;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.summary-grand-total strong small {
+  font-size: 0.75em;
+  font-weight: 400;
+}
+
+.summary-back-btn {
+  min-width: 280px;
+  min-height: 62px;
+  padding: 15px 28px;
+
+  border: 0;
+  border-radius: 16px;
+
+  color: #ffffff;
+  background: #347fc2;
+
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 700;
+
+  cursor: pointer;
+  box-shadow:
+    0 10px 20px rgba(52, 127, 194, 0.2);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.summary-back-btn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 14px 25px rgba(52, 127, 194, 0.28);
+}
+
+.summary-back-btn:active {
+  transform: scale(0.98);
+}
+
+
+/* =========================================================
+   สมาร์ทโฟน
+========================================================= */
+
+@media (max-width: 600px) {
+
+  .summary-modern {
+    min-height: 620px;
+    padding: 30px 16px 28px;
+    border-radius: 24px;
+  }
+
+  .summary-trophy {
+    font-size: 70px;
+  }
+
+  .summary-title {
+    font-size: 29px;
+  }
+
+  .summary-subtitle {
+    margin: 22px 0 34px;
+    font-size: 18px;
+  }
+
+  .summary-score-list {
+    width: 100%;
+    margin-bottom: 30px;
+  }
+
+  .summary-score-row {
+    padding: 13px 4px;
+    gap: 10px;
+  }
+
+  .summary-score-label {
+    font-size: 29px;
+  }
+
+  .summary-score-value {
+    font-size: 31px;
+  }
+
+  .summary-grand-total {
+    width: 100%;
+    min-height: 74px;
+    margin-bottom: 62px;
+    padding: 12px 14px;
+    gap: 10px;
+    border-radius: 11px;
+  }
+
+  .summary-grand-total > span {
+    font-size: 23px;
+  }
+
+  .summary-grand-total strong {
+    font-size: 34px;
+  }
+
+  .summary-back-btn {
+    min-width: 230px;
+    min-height: 56px;
+    font-size: 17px;
+  }
+}
+
+
+/* =========================================================
+   สมาร์ทโฟนหน้าจอเล็ก
+========================================================= */
+
+@media (max-width: 390px) {
+
+  .summary-modern {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .summary-score-label {
+    font-size: 25px;
+  }
+
+  .summary-score-value {
+    font-size: 27px;
+  }
+
+  .summary-grand-total {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .summary-grand-total > span {
+    font-size: 20px;
+  }
+
+  .summary-grand-total strong {
+    font-size: 29px;
   }
 }
