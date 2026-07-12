@@ -400,12 +400,40 @@ input:focus {
   font-weight: 700;
 }
 
-
-
-
 /* ทำให้บทความเลื่อนตามได้ */
 .article-content {
   max-height: 55vh;
   overflow-y: auto;
   scroll-behavior: smooth;
+}
+/* คำเป้าหมาย 20 คำ */
+.article-content [data-target] {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  text-decoration-color: #1477bd;
+}
+
+/* คำเป้าหมายที่อ่านผ่านแล้ว */
+.article-content [data-target]
+.article-reading-word.article-read {
+  color: #059669;
+}
+.article-content {
+  max-height: 55vh;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+
+  margin: 16px 0 22px;
+  padding: 18px;
+  border-radius: 16px;
+  background: #f8fbfd;
+
+  font-size: 20px;
+  line-height: 2;
+  text-align: left;
+}
+#stopArticleBtn {
+  display: block;
+  margin: 16px auto 0;
 }
