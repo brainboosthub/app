@@ -228,24 +228,30 @@
       </button>
     </div>
 
-<section id="summaryView" class="card summary hidden">
-  <div class="trophy">🏆</div>
+<section id="summaryView" class="card summary summary-modern hidden">
 
-  <h2>ทำแบบทดสอบครบแล้ว</h2>
+  <div class="summary-trophy">🏆</div>
 
-  <p>สรุปคะแนนการอ่านออกเสียง</p>
+  <h2 class="summary-title">
+    ทำแบบทดสอบครบแล้ว
+  </h2>
 
-  <div id="averageScore" class="average">
-    0 / 100 คะแนน
+  <p class="summary-subtitle">
+    สรุปคะแนนการอ่านออกเสียง
+  </p>
+
+  <div id="averageScore" class="summary-score-area">
+    <!-- app.js จะนำคะแนนมาแสดงตรงนี้ -->
   </div>
 
   <button
     type="button"
-    class="btn primary"
+    class="summary-back-btn"
     onclick="restartTest()"
   >
     กลับหน้าเลือกแบบทดสอบ
   </button>
+
 </section>
   </main>
 
