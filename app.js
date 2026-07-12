@@ -1,7 +1,64 @@
+'use strict';
+
+/* =========================================================
+   CONFIGURATION
+========================================================= */
+
 const API_URL =
   'https://script.google.com/macros/s/AKfycbyAvyBkU_vyyHwy5ekl3GIohGkA91WXL8sYIEmoaEEikGoWl7gr-OtUxfECO4fqia2Zfg/exec';
 
-  function callApi(action, data = {}) {
+const MAX_ATTEMPTS = 3;
+const WORD_SYSTEM_FULL_SCORE = 40;
+const ARTICLE_SYSTEM_FULL_SCORE = 60;
+const GRAND_TOTAL_FULL_SCORE = 100;
+
+/* =========================================================
+   GLOBAL STATE
+========================================================= */
+
+let sessionToken = '';
+let student = null;
+
+/* ระบบที่ 1: อ่านคำ 20 คำ */
+let words = [];
+let currentIndex = 0;
+let currentAttempt = 1;
+let wordSystemPoints = [];
+let recognizer = null;
+let assessmentInProgress = false;
+
+/* ระบบที่ 2: อ่านบทความต่อเนื่อง */
+let articleWords = [];
+let articleSystemPoints = [];
+let articleRecognizer = null;
+let articleRecognitionResults = [];
+let articleAssessmentInProgress = false;
+let articleFinalizeStarted = false;
+let articleAttempt = 1;
+
+/* =========================================================
+   INITIALIZATION
+========================================================= */
+
+document.addEventListener('DOMContentLoaded', () => {
+  const studentIdInput = document.getElementById('studentId');
+
+  if (studentIdInput) {
+    studentIdInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        login();
+      }
+    });
+  }
+
+  showView('loginView');
+});
+
+/* =========================================================
+   JSONP API
+========================================================= */
+
+function callApi(action, data = {}) {
   return new Promise((resolve, reject) => {
     const callbackName =
       'jsonpCallback_' +
@@ -14,9 +71,7 @@ const API_URL =
       callback: callbackName
     });
 
-    Object.keys(data).forEach(key => {
-      const value = data[key];
-
+    Object.entries(data).forEach(([key, value]) => {
       params.set(
         key,
         typeof value === 'object'
@@ -34,7 +89,11 @@ const API_URL =
 
     function cleanup() {
       clearTimeout(timer);
-      script.remove();
+
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+
       delete window[callbackName];
     }
 
@@ -61,48 +120,19 @@ const API_URL =
       );
     };
 
-    script.src =
-      API_URL + '?' + params.toString();
-
+    script.src = API_URL + '?' + params.toString();
     document.body.appendChild(script);
   });
 }
-const MAX_ATTEMPTS = 3;
 
-let sessionToken = '';
-let student = null;
-let words = [];
-let currentIndex = 0;
-let currentAttempt = 1;
-let completedScores = [];
-
-
-const MAX_ACCUMULATED_SCORE = 40;
-let recognizer = null;
-let assessmentInProgress = false;
-
-let wordSystemPoints = [];
-let articleSystemPoints = [];
-let articleWords = [];
-let currentArticleIndex = 0;
-let currentArticleAttempt = 1;
-let articleRecognizer = null;
-let articleAssessmentInProgress = false;
-let articleRecognitionResults = [];
-let articleFinalizeStarted = false;
-
-const MAX_ARTICLE_ATTEMPTS = 3;
-const WORD_SYSTEM_FULL_SCORE = 40;
-const ARTICLE_SYSTEM_FULL_SCORE = 60;
-const GRAND_TOTAL_FULL_SCORE = 100;
-
-document.getElementById('studentId').addEventListener('keydown', event => {
-  if (event.key === 'Enter') login();
-});
+/* =========================================================
+   LOGIN AND MENU
+========================================================= */
 
 async function login() {
-  const id = document.getElementById('studentId').value.trim();
+  const input = document.getElementById('studentId');
   const button = document.getElementById('loginBtn');
+  const id = String(input?.value || '').trim();
 
   if (!id) {
     Swal.fire({
@@ -119,7 +149,7 @@ async function login() {
       studentId: id
     });
 
-    if (!result || !result.success) {
+    if (!result?.success) {
       throw new Error(
         result?.message || 'ไม่พบข้อมูลนักศึกษา'
       );
@@ -128,16 +158,22 @@ async function login() {
     sessionToken = result.sessionToken;
     student = result;
 
-    document.getElementById('studentName').textContent =
-      result.name || result.studentId;
+    setText(
+      'studentName',
+      result.name || result.studentId || '—'
+    );
 
-    document.getElementById('studentLevel').textContent =
-      result.level || '';
+    setText(
+      'studentLevel',
+      result.level || ''
+    );
 
-   document.getElementById('menuStudentName').textContent =
-  result.name || result.studentId;
+    setText(
+      'menuStudentName',
+      result.name || result.studentId || '—'
+    );
 
-showView('menuView');
+    showView('menuView');
 
   } catch (error) {
     setMicIcon(false);
@@ -147,15 +183,26 @@ showView('menuView');
     setButton(button, false, 'เข้าสู่ระบบ');
   }
 }
-async function startArticleTest() {
-  document.getElementById('articleStudentName').textContent =
-    student?.name || student?.studentId || '—';
 
-  document.getElementById('articleStudentLevel').textContent =
-    student?.level || '';
+async function startWordTest() {
+  await loadWords();
+}
+
+function startArticleTest() {
+  setText(
+    'articleStudentName',
+    student?.name || student?.studentId || '—'
+  );
+
+  setText(
+    'articleStudentLevel',
+    student?.level || ''
+  );
 
   articleWords = Array.from(
-    document.querySelectorAll('#articleContent [data-target]')
+    document.querySelectorAll(
+      '#articleContent [data-target]'
+    )
   ).map((element, index) => ({
     articleWordId:
       'A' + String(index + 1).padStart(3, '0'),
@@ -184,68 +231,53 @@ async function startArticleTest() {
   articleRecognitionResults = [];
   articleAssessmentInProgress = false;
   articleFinalizeStarted = false;
+  articleAttempt = 1;
 
   resetArticleContinuousUI();
   showView('articleView');
 }
-async function startContinuousArticleAssessment() {
-  if (articleAssessmentInProgress) return;
 
-  if (typeof SpeechSDK === 'undefined') {
-    Swal.fire({
-      icon: 'error',
-      title: 'โหลด Azure Speech SDK ไม่สำเร็จ',
-      text: 'กรุณารีเฟรชหน้าเว็บแล้วลองใหม่'
-    });
-    return;
-  }
+/* =========================================================
+   VIEW MANAGEMENT
+========================================================= */
 
-  if (
-    !navigator.mediaDevices ||
-    typeof navigator.mediaDevices.getUserMedia !== 'function'
-  ) {
-    Swal.fire({
-      icon: 'error',
-      title: 'เบราว์เซอร์ไม่รองรับไมโครโฟน'
-    });
-    return;
-  }
+function showView(id) {
+  [
+    'loginView',
+    'menuView',
+    'testView',
+    'articleView',
+    'summaryView'
+  ].forEach(viewId => {
+    const element = document.getElementById(viewId);
 
-  try {
-    document.getElementById('articleStatusText').textContent =
-      'กำลังขออนุญาตใช้ไมโครโฟน...';
+    if (element) {
+      element.classList.toggle(
+        'hidden',
+        viewId !== id
+      );
+    }
+  });
 
-    const stream =
-      await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
+  const micTestArea =
+    document.getElementById('micTestArea');
 
-    stream.getTracks().forEach(track => track.stop());
+  if (micTestArea) {
+    const shouldShow =
+      id === 'testView' ||
+      id === 'articleView';
 
-    const auth = await callApi('getAzureToken', {
-      sessionToken
-    });
-
-    beginContinuousArticleAzure(auth);
-
-  } catch (error) {
-    articleAssessmentInProgress = false;
-    resetArticleContinuousUI();
-
-    Swal.fire({
-      icon: 'error',
-      title: 'ไม่สามารถเริ่มอ่านบทความได้',
-      text: error?.message || String(error)
-    });
+    micTestArea.classList.toggle(
+      'hidden',
+      !shouldShow
+    );
   }
 }
-async function startWordTest() {
-  await loadWords();
-}
+
+/* =========================================================
+   SYSTEM 1: WORD TEST
+========================================================= */
+
 async function loadWords() {
   Swal.fire({
     title: 'กำลังเตรียมแบบทดสอบ',
@@ -268,9 +300,6 @@ async function loadWords() {
 
     currentIndex = 0;
     currentAttempt = 1;
-    completedScores = [];
-
-    // รีเซ็ตคะแนนระบบอ่านคำ 20 คำ
     wordSystemPoints = [];
 
     Swal.close();
@@ -283,474 +312,95 @@ async function loadWords() {
     showError(error);
   }
 }
-function beginContinuousArticleAzure(auth) {
-  const articleElement =
-    document.getElementById('articleContent');
 
-  const referenceText = String(
-    articleElement?.textContent || ''
-  )
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (!referenceText) {
-    throw new Error('ไม่พบข้อความบทความ');
-  }
-
-  if (!auth?.token || !auth?.region) {
-    throw new Error('ข้อมูล Azure Token ไม่สมบูรณ์');
-  }
-
-  articleRecognitionResults = [];
-  articleFinalizeStarted = false;
-  articleAssessmentInProgress = true;
-
-  const speechConfig =
-    SpeechSDK.SpeechConfig.fromAuthorizationToken(
-      auth.token,
-      auth.region
-    );
-
-  speechConfig.speechRecognitionLanguage = 'th-TH';
-  speechConfig.outputFormat =
-    SpeechSDK.OutputFormat.Detailed;
-
-  const audioConfig =
-    SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-
-  articleRecognizer =
-    new SpeechSDK.SpeechRecognizer(
-      speechConfig,
-      audioConfig
-    );
-
-  const pronunciationConfig =
-    new SpeechSDK.PronunciationAssessmentConfig(
-      referenceText,
-      SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
-      SpeechSDK.PronunciationAssessmentGranularity.Word,
-      false
-    );
-
-  pronunciationConfig.applyTo(articleRecognizer);
-
-  articleRecognizer.recognizing = () => {
-    document.getElementById('articleStatusText').textContent =
-      'กำลังฟัง กรุณาอ่านบทความต่อเนื่องจนจบ';
-  };
-
-  articleRecognizer.recognized = (sender, event) => {
-    if (
-      event.result.reason !==
-      SpeechSDK.ResultReason.RecognizedSpeech
-    ) {
-      return;
-    }
-
-    const jsonText =
-      event.result.properties.getProperty(
-        SpeechSDK.PropertyId
-          .SpeechServiceResponse_JsonResult
-      );
-
-    if (!jsonText) return;
-
-    try {
-      articleRecognitionResults.push(
-        JSON.parse(jsonText)
-      );
-    } catch (error) {
-      console.error(
-        'อ่านผล Azure JSON ไม่สำเร็จ',
-        error
-      );
-    }
-  };
-
-  articleRecognizer.canceled = (sender, event) => {
-    articleAssessmentInProgress = false;
-    resetArticleContinuousUI();
-
-    Swal.fire({
-      icon: 'error',
-      title: 'การวิเคราะห์ถูกยกเลิก',
-      text:
-        event.errorDetails ||
-        String(event.reason || '')
-    });
-  };
-
-  setArticleMicIcon(true);
-
-  document
-    .getElementById('articleMicCircle')
-    .classList.add('listening');
-
-  document
-    .getElementById('stopArticleBtn')
-    .classList.remove('hidden');
-
-  document.getElementById('articleStatusText').textContent =
-    'กำลังฟัง กรุณาอ่านบทความต่อเนื่องจนจบ';
-
-  articleRecognizer.startContinuousRecognitionAsync(
-    () => {},
-    error => {
-      articleAssessmentInProgress = false;
-      resetArticleContinuousUI();
-      showError(error);
-    }
-  );
-}
-
-function stopContinuousArticleAssessment() {
-  if (!articleRecognizer) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'ระบบยังไม่ได้เริ่มฟังเสียง'
-    });
-    return;
-  }
-
-  document.getElementById('articleStatusText').textContent =
-    'กำลังหยุดและประมวลผล...';
-
-  document
-    .getElementById('stopArticleBtn')
-    .classList.add('hidden');
-
-  articleRecognizer.stopContinuousRecognitionAsync(
-    () => {
-      if (articleRecognizer) {
-        try {
-          articleRecognizer.close();
-        } catch (error) {
-          console.error(error);
-        }
-
-        articleRecognizer = null;
-      }
-
-      articleAssessmentInProgress = false;
-      finalizeArticleAssessment();
-    },
-
-    error => {
-      articleAssessmentInProgress = false;
-      resetArticleContinuousUI();
-      showError(error);
-    }
-  );
-}
-function resetArticleContinuousUI() {
-  const circle =
-    document.getElementById('articleMicCircle');
-
-  if (circle) {
-    circle.classList.remove('listening');
-  }
-
-  setArticleMicIcon(false);
-
-  const stopButton =
-    document.getElementById('stopArticleBtn');
-
-  if (stopButton) {
-    stopButton.classList.add('hidden');
-  }
-
-  const status =
-    document.getElementById('articleStatusText');
-
-  if (status) {
-    status.textContent =
-      'กดไมโครโฟน แล้วอ่านบทความทั้งหมดจนจบ ' +
-      'จากนั้นกด “หยุดและประเมินผล”';
-  }
-}
-function finalizeArticleAssessment() {
-  if (articleFinalizeStarted) return;
-  articleFinalizeStarted = true;
-
-  resetArticleContinuousUI();
-
-  console.log(
-    'จำนวนช่วงผลเสียง:',
-    articleRecognitionResults.length
-  );
-
-  if (!articleRecognitionResults.length) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'ไม่พบผลการอ่าน',
-      text:
-        'ระบบยังไม่ได้รับข้อความจากเสียง ' +
-        'กรุณาอ่านให้ชัดเจนแล้วลองใหม่'
-    });
-
-    articleFinalizeStarted = false;
-    return;
-  }
-
-  Swal.fire({
-    icon: 'success',
-    title: 'รับเสียงบทความสำเร็จ',
-    text:
-      `ระบบได้รับผลเสียงทั้งหมด ` +
-      `${articleRecognitionResults.length} ช่วง`
-  });
-}
-function calculateArticlePoint(score) {
-  score = Math.max(0, Math.min(100, Number(score) || 0));
-
-  return Math.round((score / 100) * 3 * 10) / 10;
-}
-function sumPoints(points) {
-  return points.reduce(
-    (total, point) => total + (Number(point) || 0),
-    0
-  );
-}
-
-function getGrandTotalPoint() {
-  return (
-    sumPoints(wordSystemPoints) +
-    sumPoints(articleSystemPoints)
-  );
-}
 function renderWord() {
   const item = words[currentIndex];
-  const percent = ((currentIndex + 1) / words.length) * 100;
-
-  document.getElementById('counter').textContent =
-    `คำที่ ${currentIndex + 1} จาก ${words.length}`;
-  document.getElementById('progressBar').style.width = percent + '%';
-  document.getElementById('wordText').textContent = item.word;
-  document.getElementById('wordMeta').textContent =
-    [item.level, item.category].filter(Boolean).join(' • ');
-
-  document.getElementById('resultBox').classList.add('hidden');
-  document.getElementById('micCircle').classList.remove('listening');
-  document.getElementById('statusText').textContent =
-    'เมื่อพร้อม ให้กดปุ่มแล้วอ่านคำที่แสดง';
-
-  setButton(
-    document.getElementById('recordBtn'),
-    false,
-    'กดเพื่อเริ่มอ่าน'
-  );
-}
-async function startArticleAssessment() {
-  if (articleAssessmentInProgress) return;
-
-  if (typeof SpeechSDK === 'undefined') {
-    Swal.fire({
-      icon: 'error',
-      title: 'โหลด Azure Speech SDK ไม่สำเร็จ',
-      text: 'กรุณารีเฟรชหน้าเว็บแล้วลองใหม่'
-    });
-
-    return;
-  }
-
-  const item = articleWords[currentArticleIndex];
 
   if (!item) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'ไม่พบคำที่ต้องอ่าน'
-    });
-
-    return;
-  }
-
-  try {
-    document.getElementById('articleStatusText').textContent =
-      'กำลังขออนุญาตใช้ไมโครโฟน...';
-
-    const stream =
-      await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
-
-    stream
-      .getTracks()
-      .forEach(track => track.stop());
-
-  } catch (error) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'ไม่สามารถใช้ไมโครโฟนได้',
-      text:
-        error?.message ||
-        'กรุณาอนุญาตให้เว็บไซต์ใช้ไมโครโฟน'
-    });
-
-    resetArticleRecorderUI();
-    return;
-  }
-
-  articleAssessmentInProgress = true;
-
-  document
-    .getElementById('articleMicCircle')
-    .classList.add('listening');
-
-  setArticleMicIcon(true);
-
-  document.getElementById('articleStatusText').textContent =
-    'กำลังเชื่อมต่อระบบวิเคราะห์เสียง...';
-
-  try {
-    const auth = await callApi('getAzureToken', {
-      sessionToken
-    });
-
-    beginArticleAzure(auth);
-
-  } catch (error) {
-    articleAssessmentInProgress = false;
-    resetArticleRecorderUI();
-    showError(error);
-  }
-}
-function renderArticleWord() {
-  const item = articleWords[currentArticleIndex];
-
-  if (!item) {
-    showArticleSummary();
+    showWordSummary();
     return;
   }
 
   const percent =
-    ((currentArticleIndex + 1) / articleWords.length) * 100;
+    ((currentIndex + 1) / words.length) * 100;
 
-  document.getElementById('articleCounter').textContent =
-    `คำที่ ${currentArticleIndex + 1} จาก ${articleWords.length}`;
+  setText(
+    'counter',
+    `คำที่ ${currentIndex + 1} จาก ${words.length}`
+  );
 
-  document.getElementById(
-    'articleProgressBar'
-  ).style.width = percent + '%';
+  const progressBar =
+    document.getElementById('progressBar');
 
-  document.getElementById('articleTargetWord').textContent =
-    item.word;
+  if (progressBar) {
+    progressBar.style.width = percent + '%';
+  }
 
-  document
-    .querySelectorAll('#articleContent span[data-target]')
-    .forEach(element => {
-      element.classList.remove('current-target');
-    });
+  setText('wordText', item.word || '');
 
-  item.element.classList.add('current-target');
+  setText(
+    'wordMeta',
+    [item.level, item.category]
+      .filter(Boolean)
+      .join(' • ')
+  );
 
-  item.element.scrollIntoView({
-    behavior: 'smooth',
-    block: 'center'
-  });
+  const resultBox =
+    document.getElementById('resultBox');
 
-  document.getElementById('articleStatusText').textContent =
-    'กดไมโครโฟนแล้วอ่านคำที่เน้น';
+  if (resultBox) {
+    resultBox.classList.add('hidden');
+  }
 
-  resetArticleRecorderUI();
+  const micCircle =
+    document.getElementById('micCircle');
+
+  if (micCircle) {
+    micCircle.classList.remove('listening');
+  }
+
+  setMicIcon(false);
+
+  setText(
+    'statusText',
+    'เมื่อพร้อม ให้กดไมโครโฟนแล้วอ่านคำที่แสดง'
+  );
+
+  setButton(
+    document.getElementById('recordBtn'),
+    false,
+    'กดไมโครโฟนเพื่อเริ่มอ่าน'
+  );
 }
+
 async function startAssessment() {
   if (assessmentInProgress) return;
 
-  if (typeof SpeechSDK === 'undefined') {
-    Swal.fire({
-      icon: 'error',
-      title: 'โหลด Azure Speech SDK ไม่สำเร็จ',
-      text: 'กรุณารีเฟรชหน้าเว็บแล้วลองใหม่'
-    });
-    return;
-  }
-
-  if (
-    !navigator.mediaDevices ||
-    typeof navigator.mediaDevices.getUserMedia !== 'function'
-  ) {
-    Swal.fire({
-      icon: 'error',
-      title: 'เบราว์เซอร์ไม่รองรับไมโครโฟน',
-      text: 'กรุณาเปิดระบบด้วย Google Chrome หรือ Microsoft Edge เวอร์ชันล่าสุด'
-    });
-    return;
-  }
-
-  try {
-    document.getElementById('statusText').textContent =
-      'กำลังขออนุญาตใช้ไมโครโฟน...';
-
-    /*
-     * ขอสิทธิ์จากการกดปุ่มของผู้ใช้โดยตรง
-     * ต้องทำก่อนเรียก Azure SDK
-     */
-    const testStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      }
-    });
-
-    /*
-     * ปิด stream ทดสอบทันที
-     * Azure SDK จะเปิดไมโครโฟนอีกครั้งเอง
-     */
-    testStream.getTracks().forEach(track => track.stop());
-
-  } catch (error) {
-    console.error('Microphone permission error:', error);
-
-    let title = 'ไม่สามารถใช้ไมโครโฟนได้';
-    let message =
-      'กรุณาตรวจสอบไมโครโฟน แล้วลองเปิดหน้าเว็บในแท็บใหม่อีกครั้ง';
-
-    if (
-      error.name === 'NotAllowedError' ||
-      error.name === 'PermissionDeniedError'
-    ) {
-      message =
-        'Chrome ไม่อนุญาตให้หน้าเว็บนี้ใช้ไมโครโฟน กรุณาคลิกไอคอนด้านซ้ายของ URL แล้วตั้งค่าไมโครโฟนเป็น “อนุญาต” จากนั้นรีเฟรชหน้า GitHub Pages ใหม่';
-    } else if (
-      error.name === 'NotFoundError' ||
-      error.name === 'DevicesNotFoundError'
-    ) {
-      message =
-        'ไม่พบอุปกรณ์ไมโครโฟน กรุณาเชื่อมต่อไมโครโฟนหรือตรวจสอบอุปกรณ์เสียงของ Windows';
-    } else if (
-      error.name === 'NotReadableError' ||
-      error.name === 'TrackStartError'
-    ) {
-      message =
-        'ไม่สามารถเปิดไมโครโฟนได้ อาจมีโปรแกรมอื่นกำลังใช้งานอยู่ กรุณาปิด Google Meet, Zoom หรือโปรแกรมบันทึกเสียง แล้วลองใหม่';
-    } else if (error.name === 'SecurityError') {
-      message =
-        'เบราว์เซอร์บล็อกไมโครโฟนเนื่องจากข้อกำหนดด้านความปลอดภัย กรุณาเปิดหน้า GitHub Pages โดยตรง และไม่เปิดผ่าน iframe';
-    }
-
+  if (!words[currentIndex]) {
     Swal.fire({
       icon: 'warning',
-      title: title,
-      text: message,
-      confirmButtonText: 'ตกลง'
+      title: 'ไม่พบคำที่ต้องอ่าน'
     });
+    return;
+  }
 
-    document.getElementById('statusText').textContent =
-      'ยังไม่ได้รับอนุญาตให้ใช้ไมโครโฟน';
+  if (!ensureSpeechSdk()) return;
+  if (!ensureMicrophoneSupport()) return;
 
+  try {
+    setText(
+      'statusText',
+      'กำลังขออนุญาตใช้ไมโครโฟน...'
+    );
+
+    await requestMicrophonePermission();
+
+  } catch (error) {
+    showMicrophoneError(error, 'statusText');
     return;
   }
 
   assessmentInProgress = true;
-
-  document
-    .getElementById('resultBox')
-    .classList.add('hidden');
 
   setButton(
     document.getElementById('recordBtn'),
@@ -758,27 +408,28 @@ async function startAssessment() {
     'กำลังเตรียม...'
   );
 
-  document.getElementById('statusText').textContent =
-    'กำลังเชื่อมต่อระบบวิเคราะห์เสียง...';
+  setText(
+    'statusText',
+    'กำลังเชื่อมต่อระบบวิเคราะห์เสียง...'
+  );
 
-try {
-  const auth = await callApi('getAzureToken', {
-    sessionToken
-  });
-
-  beginAzure(auth);
-
-} catch (error) {
-  assessmentInProgress = false;
-  resetRecorderUI();
-  setMicIcon(false);
-  showError(error);
-}
-}
-
-function beginArticleAzure(auth) {
   try {
-    const item = articleWords[currentArticleIndex];
+    const auth = await callApi('getAzureToken', {
+      sessionToken
+    });
+
+    beginAzureWordAssessment(auth);
+
+  } catch (error) {
+    assessmentInProgress = false;
+    resetRecorderUI();
+    showError(error);
+  }
+}
+
+function beginAzureWordAssessment(auth) {
+  try {
+    const item = words[currentIndex];
 
     if (!auth?.token || !auth?.region) {
       throw new Error('ข้อมูล Azure Token ไม่สมบูรณ์');
@@ -810,7 +461,7 @@ function beginArticleAzure(auth) {
       SpeechSDK.AudioConfig
         .fromDefaultMicrophoneInput();
 
-    articleRecognizer =
+    recognizer =
       new SpeechSDK.SpeechRecognizer(
         speechConfig,
         audioConfig
@@ -828,61 +479,64 @@ function beginArticleAzure(auth) {
         true
       );
 
-    pronunciationConfig.applyTo(articleRecognizer);
+    pronunciationConfig.applyTo(recognizer);
 
-    document
-      .getElementById('articleMicCircle')
-      .classList.add('listening');
+    const micCircle =
+      document.getElementById('micCircle');
 
-    setArticleMicIcon(true);
+    if (micCircle) {
+      micCircle.classList.add('listening');
+    }
 
-    document.getElementById('articleStatusText').textContent =
-      `กรุณาอ่านคำว่า “${item.word}”`;
+    setMicIcon(true);
 
-    articleRecognizer.recognizeOnceAsync(
+    setButton(
+      document.getElementById('recordBtn'),
+      true,
+      'กำลังฟังเสียง...'
+    );
+
+    setText(
+      'statusText',
+      `กรุณาอ่านคำว่า “${item.word}”`
+    );
+
+    recognizer.recognizeOnceAsync(
       result => {
-        closeArticleRecognizer();
-
-        articleAssessmentInProgress = false;
-
-        handleArticleRecognition(result);
+        closeRecognizer();
+        assessmentInProgress = false;
+        handleWordRecognition(result);
       },
 
       error => {
-        closeArticleRecognizer();
-
-        articleAssessmentInProgress = false;
-
-        resetArticleRecorderUI();
+        closeRecognizer();
+        assessmentInProgress = false;
+        resetRecorderUI();
 
         Swal.fire({
           icon: 'error',
           title: 'วิเคราะห์เสียงไม่สำเร็จ',
-          text: String(
-            error || 'เกิดข้อผิดพลาด'
-          )
+          text: String(error || 'เกิดข้อผิดพลาด')
         });
       }
     );
 
   } catch (error) {
-    closeArticleRecognizer();
-
-    articleAssessmentInProgress = false;
-
-    resetArticleRecorderUI();
-
+    closeRecognizer();
+    assessmentInProgress = false;
+    resetRecorderUI();
     showError(error);
   }
 }
-function handleArticleRecognition(result) {
-  resetArticleRecorderUI();
+
+function handleWordRecognition(result) {
+  resetRecorderUI();
 
   if (
     result.reason ===
     SpeechSDK.ResultReason.RecognizedSpeech
   ) {
-    const pronunciationResult =
+    const assessment =
       SpeechSDK.PronunciationAssessmentResult
         .fromResult(result);
 
@@ -891,24 +545,16 @@ function handleArticleRecognition(result) {
         cleanRecognized(result.text),
 
       accuracy:
-        safeScore(
-          pronunciationResult.accuracyScore
-        ),
+        safeScore(assessment.accuracyScore),
 
       fluency:
-        safeScore(
-          pronunciationResult.fluencyScore
-        ),
+        safeScore(assessment.fluencyScore),
 
       completeness:
-        safeScore(
-          pronunciationResult.completenessScore
-        ),
+        safeScore(assessment.completenessScore),
 
       pronunciation:
-        safeScore(
-          pronunciationResult.pronunciationScore
-        )
+        safeScore(assessment.pronunciationScore)
     };
 
     data.finalScore = round2(
@@ -916,26 +562,17 @@ function handleArticleRecognition(result) {
       data.pronunciation * 0.15
     );
 
-    // ข้อละเต็ม 3 คะแนน
     data.point =
-      calculateArticlePoint(data.finalScore);
+      calculateWordPoint(data.finalScore);
 
-    // อ่านซ้ำให้แทนคะแนนเดิม ไม่บวกซ้ำ
-    articleSystemPoints[currentArticleIndex] =
+    wordSystemPoints[currentIndex] =
       data.point;
 
-    data.articleAccumulatedPoint =
-      sumPoints(articleSystemPoints);
-
-    data.wordSystemPoint =
+    data.accumulatedPoint =
       sumPoints(wordSystemPoints);
 
-    data.grandTotalPoint =
-      getGrandTotalPoint();
-
-    showArticleResult(data);
-    saveArticleResult(data);
-
+    showWordResult(data);
+    saveWordResult(data);
     return;
   }
 
@@ -949,7 +586,6 @@ function handleArticleRecognition(result) {
       text:
         'กรุณาเข้าใกล้ไมโครโฟนและอ่านอีกครั้ง'
     });
-
     return;
   }
 
@@ -966,9 +602,8 @@ function handleArticleRecognition(result) {
       title: 'การวิเคราะห์ถูกยกเลิก',
       text:
         detail.errorDetails ||
-        'กรุณาลองใหม่อีกครั้ง'
+        String(detail.reason || 'กรุณาลองใหม่')
     });
-
     return;
   }
 
@@ -978,46 +613,23 @@ function handleArticleRecognition(result) {
     text: 'กรุณาลองใหม่อีกครั้ง'
   });
 }
-async function testMicrophoneOnly() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true
-    });
 
-    stream.getTracks().forEach(track => track.stop());
-
-    Swal.fire({
-      icon: 'success',
-      title: 'ไมโครโฟนพร้อมใช้งาน',
-      text: 'เบราว์เซอร์อนุญาตให้ระบบใช้ไมโครโฟนแล้ว'
-    });
-
-  } catch (error) {
-    Swal.fire({
-      icon: 'error',
-      title: 'ไมโครโฟนยังใช้งานไม่ได้',
-      text: error.name + ': ' + error.message
-    });
-  }
-}
-function showArticleResult(data) {
-  const item =
-    articleWords[currentArticleIndex];
+function showWordResult(data) {
+  const currentWord =
+    words[currentIndex]?.word || '—';
 
   Swal.fire({
-    title: 'ผลการอ่านบทความ',
+    title: 'ผลการอ่านออกเสียง',
     width: 620,
     allowOutsideClick: false,
 
     showCancelButton:
-      currentArticleAttempt <
-      MAX_ARTICLE_ATTEMPTS,
+      currentAttempt < MAX_ATTEMPTS,
 
     cancelButtonText: 'อ่านอีกครั้ง',
 
     confirmButtonText:
-      currentArticleIndex ===
-      articleWords.length - 1
+      currentIndex === words.length - 1
         ? 'ดูผลสรุป'
         : 'คำถัดไป',
 
@@ -1036,430 +648,35 @@ function showArticleResult(data) {
             </b>
 
             <small class="popup-point-full">
-              เต็ม 3 คะแนน
-            </small>
-          </div>
-
-          <div class="popup-point-item">
-            <span class="popup-point-title">
-              คะแนนสะสมบทความ
-            </span>
-
-            <b class="popup-point-number">
-              ${formatPoint(
-                data.articleAccumulatedPoint
-              )}
-            </b>
-
-            <small class="popup-point-full">
-              เต็ม 60 คะแนน
-            </small>
-          </div>
-
-        </div>
-
-        <div class="popup-grand-total">
-          คะแนนรวมทั้ง 2 ระบบ
-
-          <strong>
-            ${formatPoint(data.grandTotalPoint)}
-            / 100 คะแนน
-          </strong>
-        </div>
-
-        <div class="popup-word">
-          คำที่ประเมิน:
-          <strong>
-            ${escapeHtml(item.word)}
-          </strong>
-        </div>
-
-        <div class="popup-score">
-          ${Math.round(data.finalScore)}%
-        </div>
-
-        <div class="popup-status">
-          ${statusText(data.finalScore)}
-        </div>
-
-        <div class="popup-score-grid">
-          <div>
-            <b>${Math.round(data.accuracy)}</b>
-            <span>ความถูกต้อง</span>
-          </div>
-
-          <div>
-            <b>${Math.round(
-              data.pronunciation
-            )}</b>
-            <span>การออกเสียง</span>
-          </div>
-
-          <div>
-            <b>${Math.round(data.fluency)}</b>
-            <span>ความคล่อง</span>
-          </div>
-
-          <div>
-            <b>${Math.round(
-              data.completeness
-            )}</b>
-            <span>ความครบถ้วน</span>
-          </div>
-        </div>
-
-      </div>
-    `
-  }).then(result => {
-    if (result.isConfirmed) {
-      nextArticleWord();
-      return;
-    }
-
-    if (
-      result.dismiss ===
-      Swal.DismissReason.cancel
-    ) {
-      retryArticleWord();
-    }
-  });
-}
-function beginAzure(auth) {
-  try {
-    const item = words[currentIndex];
-    if (!auth?.token || !auth?.region) {
-      throw new Error('ข้อมูล Azure Token ไม่สมบูรณ์');
-    }
-
-    const speechConfig =
-      SpeechSDK.SpeechConfig.fromAuthorizationToken(auth.token, auth.region);
-
-    speechConfig.speechRecognitionLanguage = 'th-TH';
-    speechConfig.outputFormat = SpeechSDK.OutputFormat.Detailed;
-    speechConfig.setProperty(
-      SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs,
-      '5000'
-    );
-    speechConfig.setProperty(
-      SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs,
-      '1200'
-    );
-
-    const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-    recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
-
-    const config = new SpeechSDK.PronunciationAssessmentConfig(
-      item.word,
-      SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
-      SpeechSDK.PronunciationAssessmentGranularity.Word,
-      true
-    );
-    config.applyTo(recognizer);
-
-  document.getElementById('micCircle').classList.add('listening');
-setMicIcon(true);
-    setButton(document.getElementById('recordBtn'), true, 'กำลังฟังเสียง...');
-    document.getElementById('statusText').textContent =
-      `กรุณาอ่านคำว่า “${item.word}”`;
-
-    recognizer.recognizeOnceAsync(
-      result => {
-        closeRecognizer();
-        assessmentInProgress = false;
-        handleRecognition(result);
-      },
-      error => {
-        closeRecognizer();
-        assessmentInProgress = false;
-        resetRecorderUI();
-        Swal.fire({
-          icon: 'error',
-          title: 'วิเคราะห์เสียงไม่สำเร็จ',
-          text: String(error || 'เกิดข้อผิดพลาด')
-        });
-      }
-    );
-  } catch (error) {
-    closeRecognizer();
-    assessmentInProgress = false;
-    resetRecorderUI();
-    setMicIcon(false);
-    showError(error);
-  }
-}
-function retryArticleWord() {
-  if (currentArticleAttempt >= MAX_ARTICLE_ATTEMPTS) {
-    Swal.fire({
-      icon: 'info',
-      title: 'อ่านครบจำนวนครั้งแล้ว',
-      text: `คำนี้อ่านได้สูงสุด ${MAX_ARTICLE_ATTEMPTS} ครั้ง`
-    });
-    return;
-  }
-
-  currentArticleAttempt++;
-
-  resetArticleRecorderUI();
-
-  document.getElementById('articleStatusText').textContent =
-    `ครั้งที่ ${currentArticleAttempt} จาก ${MAX_ARTICLE_ATTEMPTS} — กดไมโครโฟนเพื่ออ่านอีกครั้ง`;
-}
-
-function nextArticleWord() {
-  if (
-    currentArticleIndex ===
-    articleWords.length - 1
-  ) {
-    showArticleSummary();
-    return;
-  }
-
-  currentArticleIndex++;
-  currentArticleAttempt = 1;
-
-  renderArticleWord();
-}
-function handleRecognition(result) {
-  resetRecorderUI();
-
-  if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
-    const p =
-      SpeechSDK.PronunciationAssessmentResult.fromResult(result);
-
-    const data = {
-      recognizedText: cleanRecognized(result.text),
-      accuracy: safeScore(p.accuracyScore),
-      fluency: safeScore(p.fluencyScore),
-      completeness: safeScore(p.completenessScore),
-      pronunciation: safeScore(p.pronunciationScore)
-    };
-
-data.finalScore = round2(
-  data.accuracy * 0.85 +
-  data.pronunciation * 0.15
-);
-
-data.point = calculatePoint(data.finalScore);
-
-wordSystemPoints[currentIndex] = data.point;
-
-data.accumulatedPoint = getAccumulatedPoint();
-
-data.isLikelyCorrectWord = data.accuracy >= 60;
-
-showResult(data);
-saveResult(data);
-    return;
-  }
-
-  if (result.reason === SpeechSDK.ResultReason.NoMatch) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'ไม่ได้ยินเสียงชัดเจน',
-      text: 'กรุณาเข้าใกล้ไมโครโฟนและอ่านอีกครั้ง'
-    });
-    return;
-  }
-
-  if (result.reason === SpeechSDK.ResultReason.Canceled) {
-    const detail =
-      SpeechSDK.CancellationDetails.fromResult(result);
-
-    Swal.fire({
-      icon: 'error',
-      title: 'การวิเคราะห์ถูกยกเลิก',
-      text:
-        detail.errorDetails ||
-        String(detail.reason || 'กรุณาลองใหม่')
-    });
-    return;
-  }
-
-  Swal.fire({
-    icon: 'warning',
-    title: 'ไม่สามารถอ่านผลเสียงได้',
-    text: 'กรุณาลองใหม่อีกครั้ง'
-  });
-}
-function closeArticleRecognizer() {
-  if (articleRecognizer) {
-    try {
-      articleRecognizer.close();
-    } catch (error) {
-      console.error(error);
-    }
-
-    articleRecognizer = null;
-  }
-
-  resetArticleRecorderUI();
-}
-function resetArticleRecorderUI() {
-
-  document
-    .getElementById("articleMicCircle")
-    .classList.remove("listening");
-
-  setArticleMicIcon(false);
-
-  document.getElementById(
-    "articleStatusText"
-  ).textContent =
-      "กดไมโครโฟนแล้วอ่านคำที่เน้น";
-}
-function setArticleMicIcon(listening) {
-  const icon =
-    document.getElementById("articleMicIcon");
-
-  if (!icon) return;
-
-  icon.className = listening
-      ? "fa fa-microphone"
-      : "fa fa-microphone-slash";
-}
-function showArticleSummary() {
-  closeArticleRecognizer();
-  showView('summaryView');
-
-  const articlePoint =
-    sumPoints(articleSystemPoints);
-
-  const wordPoint =
-    sumPoints(wordSystemPoints);
-
-  const grandTotal =
-    wordPoint + articlePoint;
-
-  document.getElementById(
-    'averageScore'
-  ).innerHTML = `
-    <div>
-      อ่านคำ:
-      ${formatPoint(wordPoint)} / 40
-    </div>
-
-    <div>
-      อ่านบทความ:
-      ${formatPoint(articlePoint)} / 60
-    </div>
-
-    <div style="margin-top:12px;">
-      รวม:
-      ${formatPoint(grandTotal)} / 100 คะแนน
-    </div>
-  `;
-}
-async function saveArticleResult(data) {
-  const item =
-    articleWords[currentArticleIndex];
-
-  const payload = {
-    articleWordId: item.articleWordId,
-    referenceWord: item.word,
-    recognizedText: data.recognizedText,
-
-    accuracy: data.accuracy,
-    fluency: data.fluency,
-    completeness: data.completeness,
-    pronunciation: data.pronunciation,
-
-    finalScore: data.finalScore,
-    point: data.point,
-
-    accumulatedPoint:
-      data.articleAccumulatedPoint,
-
-    fullPoint:
-      ARTICLE_SYSTEM_FULL_SCORE,
-
-    grandTotalPoint:
-      data.grandTotalPoint,
-
-    grandTotalFullPoint:
-      GRAND_TOTAL_FULL_SCORE,
-
-    attempt:
-      currentArticleAttempt
-  };
-
-  try {
-    await callApi('saveArticleResult', {
-      sessionToken,
-      payload
-    });
-
-  } catch (error) {
-    console.error(
-      'บันทึกผลบทความไม่สำเร็จ',
-      error
-    );
-
-    Swal.fire({
-      toast: true,
-      position: 'top-end',
-      icon: 'warning',
-      title:
-        'แสดงผลได้ แต่บันทึกผลบทความไม่สำเร็จ',
-      timer: 3500,
-      showConfirmButton: false
-    });
-  }
-}
-function showResult(data) {
-  const currentWord = words[currentIndex]?.word || '—';
-
-  Swal.fire({
-    title: 'ผลการอ่านออกเสียง',
-    width: 620,
-    allowOutsideClick: false,
-
-    showCancelButton: currentAttempt < MAX_ATTEMPTS,
-    cancelButtonText: 'อ่านอีกครั้ง',
-
-    confirmButtonText:
-      currentIndex === words.length - 1
-        ? 'ดูผลสรุป'
-        : 'คำถัดไป',
-
-    html: `
-      <div class="popup-result">
-
-        <!-- คะแนนข้อนี้และคะแนนสะสม -->
-        <div class="popup-point-summary">
-
-          <div class="popup-point-item">
-            <span class="popup-point-title">คะแนน</span>
-
-            <b class="popup-point-number">
-              ${formatPoint(data.point)}
-            </b>
-
-            <small class="popup-point-full">
               เต็ม 2 คะแนน
             </small>
           </div>
 
           <div class="popup-point-item">
-            <span class="popup-point-title">คะแนนสะสม</span>
+            <span class="popup-point-title">
+              คะแนนสะสม
+            </span>
 
             <b class="popup-point-number">
-              ${formatPoint(data.accumulatedPoint)}
+              ${formatPoint(
+                data.accumulatedPoint
+              )}
             </b>
 
             <small class="popup-point-full">
-              เต็ม ${MAX_ACCUMULATED_SCORE} คะแนน
+              เต็ม ${WORD_SYSTEM_FULL_SCORE} คะแนน
             </small>
           </div>
 
         </div>
 
-        <!-- คำที่ประเมิน -->
         <div class="popup-word">
           คำที่ประเมิน:
-          <strong>${escapeHtml(currentWord)}</strong>
+          <strong>
+            ${escapeHtml(currentWord)}
+          </strong>
         </div>
 
-        <!-- ย้ายเปอร์เซ็นต์มาไว้ใต้คำที่ประเมิน -->
         <div class="popup-score">
           ${Math.round(data.finalScore)}%
         </div>
@@ -1468,7 +685,6 @@ function showResult(data) {
           ${statusText(data.finalScore)}
         </div>
 
-        <!-- รายละเอียดคะแนน -->
         <div class="popup-score-grid">
           <div>
             <b>${Math.round(data.accuracy)}</b>
@@ -1476,7 +692,9 @@ function showResult(data) {
           </div>
 
           <div>
-            <b>${Math.round(data.pronunciation)}</b>
+            <b>
+              ${Math.round(data.pronunciation)}
+            </b>
             <span>การออกเสียง</span>
           </div>
 
@@ -1486,7 +704,9 @@ function showResult(data) {
           </div>
 
           <div>
-            <b>${Math.round(data.completeness)}</b>
+            <b>
+              ${Math.round(data.completeness)}
+            </b>
             <span>ความครบถ้วน</span>
           </div>
         </div>
@@ -1499,14 +719,21 @@ function showResult(data) {
       return;
     }
 
-    if (result.dismiss === Swal.DismissReason.cancel) {
+    if (
+      result.dismiss ===
+      Swal.DismissReason.cancel
+    ) {
       retryCurrentWord();
     }
   });
 }
-async function saveResult(data) {
+
+async function saveWordResult(data) {
   const item = words[currentIndex];
   const savedIndex = currentIndex;
+  const savedAttempt = currentAttempt;
+
+  if (!item) return;
 
   const payload = {
     wordId: item.wordId,
@@ -1518,8 +745,8 @@ async function saveResult(data) {
     pronunciation: data.pronunciation,
     point: data.point,
     accumulatedPoint: data.accumulatedPoint,
-    fullPoint: MAX_ACCUMULATED_SCORE,
-    attempt: currentAttempt
+    fullPoint: WORD_SYSTEM_FULL_SCORE,
+    attempt: savedAttempt
   };
 
   try {
@@ -1528,118 +755,969 @@ async function saveResult(data) {
       payload
     });
 
-    if (result?.success) {
-      completedScores[savedIndex] =
-        Number(result.finalScore) || 0;
+    if (
+      result?.success &&
+      Number.isFinite(Number(result.point))
+    ) {
+      wordSystemPoints[savedIndex] =
+        Number(result.point);
     }
-  } catch (error) {
-    console.error('บันทึกผลไม่สำเร็จ', error);
 
-    Swal.fire({
-      toast: true,
-      position: 'top-end',
-      icon: 'warning',
-      title: 'แสดงผลได้ แต่บันทึกลงชีตไม่สำเร็จ',
-      timer: 3500,
-      showConfirmButton: false
-    });
+  } catch (error) {
+    console.error(
+      'บันทึกผลอ่านคำไม่สำเร็จ',
+      error
+    );
+
+    showSaveWarning(
+      'แสดงผลได้ แต่บันทึกลงชีตไม่สำเร็จ'
+    );
   }
 }
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+
 function retryCurrentWord() {
   if (currentAttempt >= MAX_ATTEMPTS) {
     Swal.fire({
       icon: 'info',
       title: 'อ่านครบจำนวนครั้งแล้ว',
-      text: `คำนี้อ่านได้สูงสุด ${MAX_ATTEMPTS} ครั้ง`
+      text:
+        `คำนี้อ่านได้สูงสุด ` +
+        `${MAX_ATTEMPTS} ครั้ง`
     });
     return;
   }
+
   currentAttempt++;
-  document.getElementById('resultBox').classList.add('hidden');
-  document.getElementById('statusText').textContent =
-    `ครั้งที่ ${currentAttempt} จาก ${MAX_ATTEMPTS}`;
-  setButton(document.getElementById('recordBtn'), false, 'กดเพื่ออ่านอีกครั้ง');
+
+  setText(
+    'statusText',
+    `ครั้งที่ ${currentAttempt} จาก ` +
+    `${MAX_ATTEMPTS} — กดไมโครโฟนเพื่ออ่านอีกครั้ง`
+  );
+
+  setButton(
+    document.getElementById('recordBtn'),
+    false,
+    'กดไมโครโฟนเพื่ออ่านอีกครั้ง'
+  );
+
+  setMicIcon(false);
 }
 
 function nextWord() {
-  if (currentIndex === words.length - 1) {
-    showSummary();
+  if (currentIndex >= words.length - 1) {
+    showWordSummary();
     return;
   }
+
   currentIndex++;
   currentAttempt = 1;
   renderWord();
 }
 
-function showSummary() {
+function showWordSummary() {
   closeRecognizer();
   showView('summaryView');
 
-  const totalPoint = getAccumulatedPoint();
+  const totalPoint =
+    sumPoints(wordSystemPoints);
 
-  document.getElementById('averageScore').textContent =
-    formatPoint(totalPoint) + ' / 40 คะแนน';
+  const averageScore =
+    document.getElementById('averageScore');
+
+  if (averageScore) {
+    averageScore.textContent =
+      formatPoint(totalPoint) +
+      ` / ${WORD_SYSTEM_FULL_SCORE} คะแนน`;
+  }
 }
 
-function restartTest(){
+/* =========================================================
+   SYSTEM 2: CONTINUOUS ARTICLE READING
+========================================================= */
 
-    showView("menuView");
+async function startContinuousArticleAssessment() {
+  if (articleAssessmentInProgress) return;
 
+  if (!ensureSpeechSdk()) return;
+  if (!ensureMicrophoneSupport()) return;
+
+  if (articleWords.length !== 20) {
+    startArticleTest();
+
+    if (articleWords.length !== 20) {
+      return;
+    }
+  }
+
+  try {
+    setText(
+      'articleStatusText',
+      'กำลังขออนุญาตใช้ไมโครโฟน...'
+    );
+
+    await requestMicrophonePermission();
+
+    const auth = await callApi('getAzureToken', {
+      sessionToken
+    });
+
+    beginContinuousArticleAzure(auth);
+
+  } catch (error) {
+    articleAssessmentInProgress = false;
+    resetArticleContinuousUI();
+
+    Swal.fire({
+      icon: 'error',
+      title: 'ไม่สามารถเริ่มอ่านบทความได้',
+      text: error?.message || String(error)
+    });
+  }
 }
 
-function showView(id) {
-  [
-    'loginView',
-    'menuView',
-    'testView',
-    'articleView',
-    'summaryView'
-  ].forEach(viewId => {
-    const element = document.getElementById(viewId);
+function beginContinuousArticleAzure(auth) {
+  const articleElement =
+    document.getElementById('articleContent');
 
-    if (element) {
-      element.classList.toggle(
-        'hidden',
-        viewId !== id
+  const referenceText =
+    normalizeWhitespace(
+      articleElement?.textContent || ''
+    );
+
+  if (!referenceText) {
+    throw new Error('ไม่พบข้อความบทความ');
+  }
+
+  if (!auth?.token || !auth?.region) {
+    throw new Error('ข้อมูล Azure Token ไม่สมบูรณ์');
+  }
+
+  closeArticleRecognizer(false);
+
+  articleRecognitionResults = [];
+  articleFinalizeStarted = false;
+  articleAssessmentInProgress = true;
+
+  const speechConfig =
+    SpeechSDK.SpeechConfig.fromAuthorizationToken(
+      auth.token,
+      auth.region
+    );
+
+  speechConfig.speechRecognitionLanguage = 'th-TH';
+  speechConfig.outputFormat =
+    SpeechSDK.OutputFormat.Detailed;
+
+  speechConfig.setProperty(
+    SpeechSDK.PropertyId
+      .SpeechServiceConnection_InitialSilenceTimeoutMs,
+    '10000'
+  );
+
+  speechConfig.setProperty(
+    SpeechSDK.PropertyId
+      .SpeechServiceConnection_EndSilenceTimeoutMs,
+    '3000'
+  );
+
+  const audioConfig =
+    SpeechSDK.AudioConfig
+      .fromDefaultMicrophoneInput();
+
+  articleRecognizer =
+    new SpeechSDK.SpeechRecognizer(
+      speechConfig,
+      audioConfig
+    );
+
+  const pronunciationConfig =
+    new SpeechSDK.PronunciationAssessmentConfig(
+      referenceText,
+      SpeechSDK
+        .PronunciationAssessmentGradingSystem
+        .HundredMark,
+      SpeechSDK
+        .PronunciationAssessmentGranularity
+        .Word,
+      false
+    );
+
+  pronunciationConfig.applyTo(articleRecognizer);
+
+  articleRecognizer.recognizing = () => {
+    setText(
+      'articleStatusText',
+      'กำลังฟัง กรุณาอ่านบทความต่อเนื่องจนจบ'
+    );
+  };
+
+  articleRecognizer.recognized = (
+    sender,
+    event
+  ) => {
+    if (
+      event.result.reason !==
+      SpeechSDK.ResultReason.RecognizedSpeech
+    ) {
+      return;
+    }
+
+    const jsonText =
+      event.result.properties.getProperty(
+        SpeechSDK.PropertyId
+          .SpeechServiceResponse_JsonResult
+      );
+
+    if (!jsonText) return;
+
+    try {
+      articleRecognitionResults.push(
+        JSON.parse(jsonText)
+      );
+    } catch (error) {
+      console.error(
+        'อ่านผล Azure JSON ไม่สำเร็จ',
+        error
       );
     }
+  };
+
+  articleRecognizer.canceled = (
+    sender,
+    event
+  ) => {
+    articleAssessmentInProgress = false;
+
+    if (
+      articleFinalizeStarted ||
+      event.reason ===
+        SpeechSDK.CancellationReason.EndOfStream
+    ) {
+      return;
+    }
+
+    resetArticleContinuousUI();
+
+    Swal.fire({
+      icon: 'error',
+      title: 'การวิเคราะห์ถูกยกเลิก',
+      text:
+        event.errorDetails ||
+        String(event.reason || '')
+    });
+  };
+
+  articleRecognizer.sessionStopped = () => {
+    if (
+      articleAssessmentInProgress &&
+      !articleFinalizeStarted
+    ) {
+      articleAssessmentInProgress = false;
+      finalizeArticleAssessment();
+    }
+  };
+
+  const micCircle =
+    document.getElementById('articleMicCircle');
+
+  if (micCircle) {
+    micCircle.classList.add('listening');
+  }
+
+  setArticleMicIcon(true);
+
+  const stopButton =
+    document.getElementById('stopArticleBtn');
+
+  if (stopButton) {
+    stopButton.classList.remove('hidden');
+  }
+
+  setText(
+    'articleStatusText',
+    'กำลังฟัง กรุณาอ่านบทความต่อเนื่องจนจบ'
+  );
+
+  articleRecognizer.startContinuousRecognitionAsync(
+    () => {},
+    error => {
+      articleAssessmentInProgress = false;
+      closeArticleRecognizer();
+      showError(error);
+    }
+  );
+}
+
+function stopContinuousArticleAssessment() {
+  if (!articleRecognizer) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'ระบบยังไม่ได้เริ่มฟังเสียง'
+    });
+    return;
+  }
+
+  setText(
+    'articleStatusText',
+    'กำลังหยุดและประมวลผล...'
+  );
+
+  const stopButton =
+    document.getElementById('stopArticleBtn');
+
+  if (stopButton) {
+    stopButton.classList.add('hidden');
+  }
+
+  const currentRecognizer =
+    articleRecognizer;
+
+  currentRecognizer
+    .stopContinuousRecognitionAsync(
+      () => {
+        if (
+          articleRecognizer ===
+          currentRecognizer
+        ) {
+          try {
+            currentRecognizer.close();
+          } catch (error) {
+            console.error(error);
+          }
+
+          articleRecognizer = null;
+        }
+
+        articleAssessmentInProgress = false;
+        finalizeArticleAssessment();
+      },
+
+      error => {
+        articleAssessmentInProgress = false;
+        closeArticleRecognizer();
+        showError(error);
+      }
+    );
+}
+
+function finalizeArticleAssessment() {
+  if (articleFinalizeStarted) return;
+
+  articleFinalizeStarted = true;
+  articleAssessmentInProgress = false;
+
+  resetArticleContinuousUI();
+
+  const targetResults =
+    evaluateArticleTargetWords();
+
+  if (!targetResults.length) {
+    articleFinalizeStarted = false;
+
+    Swal.fire({
+      icon: 'warning',
+      title: 'ไม่พบผลการอ่าน',
+      text:
+        'ระบบยังไม่ได้รับข้อความจากเสียง ' +
+        'กรุณาอ่านให้ชัดเจนแล้วลองใหม่'
+    });
+    return;
+  }
+
+  articleSystemPoints =
+    targetResults.map(item => item.point);
+
+  const articleTotal =
+    round1(sumPoints(articleSystemPoints));
+
+  const wordTotal =
+    round1(sumPoints(wordSystemPoints));
+
+  const grandTotal =
+    round1(wordTotal + articleTotal);
+
+  showContinuousArticleResult(
+    targetResults,
+    articleTotal,
+    grandTotal
+  );
+
+  saveContinuousArticleResults(
+    targetResults,
+    articleTotal,
+    grandTotal
+  );
+}
+
+function evaluateArticleTargetWords() {
+  const recognizedWords =
+    collectRecognizedArticleWords();
+
+  if (!recognizedWords.length) {
+    return [];
+  }
+
+  return articleWords.map(target => {
+    const normalizedTarget =
+      normalizeThaiWord(target.word);
+
+    const exactMatches =
+      recognizedWords.filter(item =>
+        item.word === normalizedTarget
+      );
+
+    const bestMatch =
+      exactMatches.sort(
+        (a, b) =>
+          b.accuracy - a.accuracy
+      )[0];
+
+    const accuracy =
+      bestMatch
+        ? bestMatch.accuracy
+        : 0;
+
+    const point =
+      calculateArticlePoint(accuracy);
+
+    return {
+      articleWordId:
+        target.articleWordId,
+
+      referenceWord:
+        target.word,
+
+      recognizedWord:
+        bestMatch?.rawWord || '',
+
+      accuracy,
+
+      point,
+
+      errorType:
+        bestMatch
+          ? bestMatch.errorType
+          : 'Omission'
+    };
+  });
+}
+
+function collectRecognizedArticleWords() {
+  const output = [];
+
+  articleRecognitionResults.forEach(result => {
+    const nBest =
+      Array.isArray(result?.NBest)
+        ? result.NBest
+        : [];
+
+    const best = nBest[0];
+
+    const resultWords =
+      Array.isArray(best?.Words)
+        ? best.Words
+        : [];
+
+    resultWords.forEach(wordItem => {
+      const rawWord =
+        String(wordItem?.Word || '').trim();
+
+      output.push({
+        rawWord,
+
+        word:
+          normalizeThaiWord(rawWord),
+
+        accuracy:
+          safeScore(
+            wordItem
+              ?.PronunciationAssessment
+              ?.AccuracyScore
+          ),
+
+        errorType:
+          String(
+            wordItem
+              ?.PronunciationAssessment
+              ?.ErrorType ||
+            'None'
+          )
+      });
+    });
   });
 
-  const micTestArea =
-    document.getElementById('micTestArea');
+  return output;
+}
 
-  if (micTestArea) {
-    const showMicTest =
-      id === 'testView' ||
-      id === 'articleView';
+function showContinuousArticleResult(
+  results,
+  articleTotal,
+  grandTotal
+) {
+  const rows = results.map(
+    (item, index) => `
+      <tr>
+        <td>${index + 1}</td>
 
-    micTestArea.classList.toggle(
-      'hidden',
-      !showMicTest
+        <td>
+          ${escapeHtml(item.referenceWord)}
+        </td>
+
+        <td>
+          ${Math.round(item.accuracy)}%
+        </td>
+
+        <td>
+          ${formatPoint(item.point)} / 3
+        </td>
+      </tr>
+    `
+  ).join('');
+
+  Swal.fire({
+    title: 'ผลการอ่านบทความ',
+    width: 760,
+    allowOutsideClick: false,
+    confirmButtonText: 'ดูผลสรุป',
+
+    html: `
+      <div class="popup-result">
+
+        <div class="popup-point-summary">
+
+          <div class="popup-point-item">
+            <span class="popup-point-title">
+              คะแนนบทความ
+            </span>
+
+            <b class="popup-point-number">
+              ${formatPoint(articleTotal)}
+            </b>
+
+            <small class="popup-point-full">
+              เต็ม ${ARTICLE_SYSTEM_FULL_SCORE} คะแนน
+            </small>
+          </div>
+
+          <div class="popup-point-item">
+            <span class="popup-point-title">
+              คะแนนรวม
+            </span>
+
+            <b class="popup-point-number">
+              ${formatPoint(grandTotal)}
+            </b>
+
+            <small class="popup-point-full">
+              เต็ม ${GRAND_TOTAL_FULL_SCORE} คะแนน
+            </small>
+          </div>
+
+        </div>
+
+        <div class="article-result-table-wrap">
+          <table class="article-result-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>คำเป้าหมาย</th>
+                <th>ความถูกต้อง</th>
+                <th>คะแนน</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    `
+  }).then(result => {
+    if (result.isConfirmed) {
+      showArticleSummary();
+    }
+  });
+}
+
+async function saveContinuousArticleResults(
+  results,
+  articleTotal,
+  grandTotal
+) {
+  const requests = results.map(item => {
+    const payload = {
+      articleWordId:
+        item.articleWordId,
+
+      referenceWord:
+        item.referenceWord,
+
+      recognizedText:
+        item.recognizedWord,
+
+      accuracy:
+        item.accuracy,
+
+      fluency: 0,
+
+      completeness:
+        item.errorType === 'Omission'
+          ? 0
+          : 100,
+
+      pronunciation:
+        item.accuracy,
+
+      finalScore:
+        item.accuracy,
+
+      point:
+        item.point,
+
+      accumulatedPoint:
+        articleTotal,
+
+      fullPoint:
+        ARTICLE_SYSTEM_FULL_SCORE,
+
+      grandTotalPoint:
+        grandTotal,
+
+      grandTotalFullPoint:
+        GRAND_TOTAL_FULL_SCORE,
+
+      attempt:
+        articleAttempt,
+
+      errorType:
+        item.errorType
+    };
+
+    return callApi('saveArticleResult', {
+      sessionToken,
+      payload
+    });
+  });
+
+  const settled =
+    await Promise.allSettled(requests);
+
+  const failedCount =
+    settled.filter(
+      item => item.status === 'rejected'
+    ).length;
+
+  if (failedCount > 0) {
+    console.error(
+      'บันทึกผลบทความไม่สำเร็จบางรายการ:',
+      settled
+    );
+
+    showSaveWarning(
+      `บันทึกผลบทความไม่สำเร็จ ` +
+      `${failedCount} จาก ${results.length} รายการ`
     );
   }
 }
 
+function showArticleSummary() {
+  closeArticleRecognizer();
+  showView('summaryView');
+
+  const articlePoint =
+    round1(sumPoints(articleSystemPoints));
+
+  const wordPoint =
+    round1(sumPoints(wordSystemPoints));
+
+  const grandTotal =
+    round1(wordPoint + articlePoint);
+
+  const averageScore =
+    document.getElementById('averageScore');
+
+  if (averageScore) {
+    averageScore.innerHTML = `
+      <div>
+        อ่านคำ:
+        ${formatPoint(wordPoint)}
+        / ${WORD_SYSTEM_FULL_SCORE}
+      </div>
+
+      <div>
+        อ่านบทความ:
+        ${formatPoint(articlePoint)}
+        / ${ARTICLE_SYSTEM_FULL_SCORE}
+      </div>
+
+      <div style="margin-top:12px;">
+        รวม:
+        ${formatPoint(grandTotal)}
+        / ${GRAND_TOTAL_FULL_SCORE} คะแนน
+      </div>
+    `;
+  }
+}
+
+function resetArticleContinuousUI() {
+  const circle =
+    document.getElementById('articleMicCircle');
+
+  if (circle) {
+    circle.classList.remove('listening');
+  }
+
+  setArticleMicIcon(false);
+
+  const stopButton =
+    document.getElementById('stopArticleBtn');
+
+  if (stopButton) {
+    stopButton.classList.add('hidden');
+  }
+
+  setText(
+    'articleStatusText',
+    'กดไมโครโฟน แล้วอ่านบทความทั้งหมดจนจบ ' +
+    'จากนั้นกด “หยุดและประเมินผล”'
+  );
+}
+
+function closeArticleRecognizer(
+  resetUi = true
+) {
+  if (articleRecognizer) {
+    try {
+      articleRecognizer.close();
+    } catch (error) {
+      console.error(error);
+    }
+
+    articleRecognizer = null;
+  }
+
+  articleAssessmentInProgress = false;
+
+  if (resetUi) {
+    resetArticleContinuousUI();
+  }
+}
+
+/* =========================================================
+   MICROPHONE TEST
+========================================================= */
+
+async function testMicrophoneOnly() {
+  try {
+    await requestMicrophonePermission();
+
+    Swal.fire({
+      icon: 'success',
+      title: 'ไมโครโฟนพร้อมใช้งาน',
+      text:
+        'เบราว์เซอร์อนุญาตให้ระบบใช้ไมโครโฟนแล้ว'
+    });
+
+  } catch (error) {
+    Swal.fire({
+      icon: 'error',
+      title: 'ไมโครโฟนยังใช้งานไม่ได้',
+      text:
+        `${error?.name || 'Error'}: ` +
+        `${error?.message || String(error)}`
+    });
+  }
+}
+
+/* =========================================================
+   SHARED SCORING
+========================================================= */
+
+function calculateWordPoint(score) {
+  score = Number(score) || 0;
+
+  if (score >= 70) {
+    return 2;
+  }
+
+  if (score >= 41) {
+    const point =
+      1.1 +
+      ((score - 41) * 0.8 / 28);
+
+    return round1(point);
+  }
+
+  if (score >= 40) {
+    return 1;
+  }
+
+  if (score >= 11) {
+    const point =
+      0.1 +
+      ((score - 11) * 0.8 / 28);
+
+    return round1(point);
+  }
+
+  return 0;
+}
+
+function calculateArticlePoint(score) {
+  const normalizedScore =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(score) || 0
+      )
+    );
+
+  return round1(
+    (normalizedScore / 100) * 3
+  );
+}
+
+function sumPoints(points) {
+  return points.reduce(
+    (total, point) =>
+      total + (Number(point) || 0),
+    0
+  );
+}
+
+/* =========================================================
+   SHARED MICROPHONE AND RECOGNIZER HELPERS
+========================================================= */
+
+function ensureSpeechSdk() {
+  if (typeof SpeechSDK !== 'undefined') {
+    return true;
+  }
+
+  Swal.fire({
+    icon: 'error',
+    title: 'โหลด Azure Speech SDK ไม่สำเร็จ',
+    text: 'กรุณารีเฟรชหน้าเว็บแล้วลองใหม่'
+  });
+
+  return false;
+}
+
+function ensureMicrophoneSupport() {
+  if (
+    navigator.mediaDevices &&
+    typeof navigator.mediaDevices
+      .getUserMedia === 'function'
+  ) {
+    return true;
+  }
+
+  Swal.fire({
+    icon: 'error',
+    title: 'เบราว์เซอร์ไม่รองรับไมโครโฟน',
+    text:
+      'กรุณาเปิดระบบด้วย Google Chrome, ' +
+      'Microsoft Edge หรือ Safari เวอร์ชันล่าสุด'
+  });
+
+  return false;
+}
+
+async function requestMicrophonePermission() {
+  const stream =
+    await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+
+  stream
+    .getTracks()
+    .forEach(track => track.stop());
+}
+
+function showMicrophoneError(
+  error,
+  statusElementId
+) {
+  console.error(
+    'Microphone permission error:',
+    error
+  );
+
+  let title =
+    'ไม่สามารถใช้ไมโครโฟนได้';
+
+  let message =
+    'กรุณาตรวจสอบไมโครโฟนและลองใหม่';
+
+  if (
+    error?.name === 'NotAllowedError' ||
+    error?.name === 'PermissionDeniedError'
+  ) {
+    message =
+      'เบราว์เซอร์ไม่อนุญาตให้เว็บไซต์ใช้ไมโครโฟน ' +
+      'กรุณาตั้งค่าไมโครโฟนเป็น “อนุญาต” แล้วรีเฟรชหน้าเว็บ';
+  } else if (
+    error?.name === 'NotFoundError' ||
+    error?.name === 'DevicesNotFoundError'
+  ) {
+    message =
+      'ไม่พบอุปกรณ์ไมโครโฟน กรุณาตรวจสอบอุปกรณ์เสียง';
+  } else if (
+    error?.name === 'NotReadableError' ||
+    error?.name === 'TrackStartError'
+  ) {
+    message =
+      'ไม่สามารถเปิดไมโครโฟนได้ ' +
+      'อาจมีโปรแกรมอื่นกำลังใช้งานอยู่';
+  } else if (
+    error?.name === 'SecurityError'
+  ) {
+    message =
+      'เบราว์เซอร์บล็อกไมโครโฟน ' +
+      'กรุณาเปิดหน้า GitHub Pages โดยตรง';
+  }
+
+  Swal.fire({
+    icon: 'warning',
+    title,
+    text: message,
+    confirmButtonText: 'ตกลง'
+  });
+
+  setText(
+    statusElementId,
+    'ยังไม่ได้รับอนุญาตให้ใช้ไมโครโฟน'
+  );
+}
+
 function resetRecorderUI() {
-  document.getElementById('micCircle').classList.remove('listening');
+  const micCircle =
+    document.getElementById('micCircle');
+
+  if (micCircle) {
+    micCircle.classList.remove('listening');
+  }
+
   setMicIcon(false);
 
   setButton(
     document.getElementById('recordBtn'),
     false,
-    'กดเพื่อเริ่มอ่าน'
+    'กดไมโครโฟนเพื่อเริ่มอ่าน'
   );
 
-  document.getElementById('statusText').textContent =
-    'เมื่อพร้อม ให้กดปุ่มแล้วอ่านคำที่แสดง';
+  setText(
+    'statusText',
+    'เมื่อพร้อม ให้กดไมโครโฟนแล้วอ่านคำที่แสดง'
+  );
 }
 
 function closeRecognizer() {
@@ -1653,95 +1731,172 @@ function closeRecognizer() {
     recognizer = null;
   }
 
-  const circle = document.getElementById('micCircle');
-
-  if (circle) {
-    circle.classList.remove('listening');
-  }
-
-  setMicIcon(false);
+  assessmentInProgress = false;
+  resetRecorderUI();
 }
+
 function setMicIcon(listening) {
-  const icon = document.getElementById("micIcon");
+  const icon =
+    document.getElementById('micIcon');
+
   if (!icon) return;
 
-  if (listening) {
-    icon.className = "fa fa-microphone";
-  } else {
-    icon.className = "fa fa-microphone-slash";
-  }
-}
-function setButton(button, disabled, text) {
-  button.disabled = disabled;
-  button.textContent = text;
+  icon.className =
+    listening
+      ? 'fa fa-microphone'
+      : 'fa fa-microphone-slash';
 }
 
+function setArticleMicIcon(listening) {
+  const icon =
+    document.getElementById('articleMicIcon');
+
+  if (!icon) return;
+
+  icon.className =
+    listening
+      ? 'fa fa-microphone'
+      : 'fa fa-microphone-slash';
+}
+
+/* =========================================================
+   SHARED UI AND TEXT HELPERS
+========================================================= */
+
+function restartTest() {
+  closeRecognizer();
+  closeArticleRecognizer();
+  showView('menuView');
+}
+
+function setText(id, text) {
+  const element =
+    document.getElementById(id);
+
+  if (element) {
+    element.textContent =
+      String(text ?? '');
+  }
+}
+
+function setButton(
+  button,
+  disabled,
+  text
+) {
+  if (!button) return;
+
+  button.disabled = Boolean(disabled);
+  button.textContent =
+    String(text ?? '');
+}
+
+function showSaveWarning(title) {
+  Swal.fire({
+    toast: true,
+    position: 'top-end',
+    icon: 'warning',
+    title,
+    timer: 3500,
+    showConfirmButton: false
+  });
+}
+
+function showError(error) {
+  const message =
+    error?.message ||
+    String(error || 'เกิดข้อผิดพลาด');
+
+  Swal.fire({
+    icon: 'error',
+    title: 'เกิดข้อผิดพลาด',
+    text: message
+  });
+}
+
+/* =========================================================
+   NORMALIZATION AND FORMATTING
+========================================================= */
+
 function cleanRecognized(text) {
-  return String(text || '').replace(/[.。!?！？,，]+$/g, '').trim();
+  return String(text || '')
+    .replace(/[.。!?！？,，]+$/g, '')
+    .trim();
+}
+
+function normalizeWhitespace(value) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeThaiWord(value) {
+  return String(value || '')
+    .normalize('NFC')
+    .replace(
+      /[\s.,!?;:"'“”‘’()（）[\]{}<>]/g,
+      ''
+    )
+    .trim();
 }
 
 function safeScore(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
+  const number = Number(value);
+
+  return Number.isFinite(number)
+    ? Math.max(0, Math.min(100, number))
+    : 0;
+}
+
+function round1(value) {
+  return (
+    Math.round(
+      (Number(value) || 0) * 10
+    ) / 10
+  );
 }
 
 function round2(value) {
-  return Math.round(Number(value || 0) * 100) / 100;
-}
-function calculatePoint(score) {
-  score = Number(score) || 0;
-
-  if (score >= 70) {
-    return 2;
-  }
-
-  if (score >= 41) {
-    // 41% = 1.1 และ 69% = 1.9
-    const point =
-      1.1 + ((score - 41) * 0.8 / 28);
-
-    return Math.round(point * 10) / 10;
-  }
-
-  if (score >= 40) {
-    return 1;
-  }
-
-if (score >= 11) {
-
-  const point =
-      0.1 + ((score - 11) * 0.8 / 28);
-
-  return Math.round(point * 10) / 10;
-}
-
-  return 0;
-}
-
-function getAccumulatedPoint() {
-  return wordSystemPoints.reduce(
-    (total, point) =>
-      total + (Number(point) || 0),
-    0
+  return (
+    Math.round(
+      (Number(value) || 0) * 100
+    ) / 100
   );
 }
 
 function formatPoint(value) {
-  const number = Number(value) || 0;
+  const number = round1(value);
 
   return Number.isInteger(number)
     ? String(number)
     : number.toFixed(1);
 }
+
 function statusText(score) {
-  if (score >= 90) return 'อ่านถูกต้องดีมาก';
-  if (score >= 80) return 'อ่านได้ดี';
-  if (score >= 70) return 'ผ่านเกณฑ์';
-  if (score >= 50) return 'ควรฝึกเพิ่มเติม';
+  if (score >= 90) {
+    return 'อ่านถูกต้องดีมาก';
+  }
+
+  if (score >= 80) {
+    return 'อ่านได้ดี';
+  }
+
+  if (score >= 70) {
+    return 'ผ่านเกณฑ์';
+  }
+
+  if (score >= 50) {
+    return 'ควรฝึกเพิ่มเติม';
+  }
+
   return 'ควรอ่านใหม่';
 }
 
-function showError(error) {
-  const message = error?.message || String(error || 'เกิดข้อผิดพลาด');
-  Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: message });
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
