@@ -955,32 +955,16 @@ function beginContinuousArticleAzure(auth) {
 
   pronunciationConfig.applyTo(articleRecognizer);
 
-articleRecognizer.recognizing = (
-  sender,
-  event
-) => {
-  articleLiveTranscript =
-    String(
-      event?.result?.text || ''
-    ).trim();
-
-  const fullTranscript =
-    (
-      articleConfirmedTranscript +
-      ' ' +
-      articleLiveTranscript
-    ).trim();
-
-  updateArticleWordHighlight(
-    fullTranscript
-  );
-
+articleRecognizer.recognizing = () => {
+  /*
+   * ไม่ไฮไลต์จากผลชั่วคราว
+   * เพราะ Azure อาจคาดเดาข้อความล่วงหน้า
+   */
   setText(
     'articleStatusText',
     'กำลังฟังและติดตามตำแหน่งการอ่าน...'
   );
 };
-
   articleRecognizer.recognized = (
     sender,
     event
@@ -1006,8 +990,12 @@ if (confirmedText) {
 
   articleLiveTranscript = '';
 
-  updateArticleWordHighlight(
-    articleConfirmedTranscript
+  /*
+   * ใช้เฉพาะข้อความช่วงใหม่ที่ Azure ยืนยันแล้ว
+   * ไม่ส่งข้อความสะสมทั้งหมดกลับไปตรวจซ้ำ
+   */
+  advanceArticleWordHighlight(
+    confirmedText
   );
 }
     const jsonText =
@@ -1277,78 +1265,95 @@ function getSpokenArticleWords(text) {
     .map(normalizeThaiWord)
     .filter(Boolean);
 }
-
-function findArticleWordPosition(spokenText) {
+function advanceArticleWordHighlight(
+  confirmedText
+) {
   const spokenWords =
-    getSpokenArticleWords(spokenText);
+    getSpokenArticleWords(
+      confirmedText
+    );
 
-  if (!spokenWords.length) {
-    return -1;
-  }
+  if (!spokenWords.length) return;
 
-  let referenceIndex = 0;
-  let lastMatchedIndex = -1;
+  /*
+   * เริ่มค้นหาหลังตำแหน่งที่ไฮไลต์ล่าสุด
+   */
+  let referenceCursor =
+    Math.max(
+      0,
+      articleHighlightIndex + 1
+    );
 
-  for (
-    let spokenIndex = 0;
-    spokenIndex < spokenWords.length;
-    spokenIndex++
-  ) {
-    const spokenWord =
-      spokenWords[spokenIndex];
+  let newestMatchedIndex =
+    articleHighlightIndex;
 
-    let foundIndex = -1;
+  spokenWords.forEach(spokenWord => {
+    let matchedIndex = -1;
+    let bestSimilarity = 0;
 
-const searchLimit =
-  Math.min(
-    articleWordElements.length,
-    referenceIndex + 30
-  );
+    /*
+     * จำกัดการค้นหาไม่เกิน 10 คำข้างหน้า
+     * ป้องกันสีวิ่งกระโดดไปไกล
+     */
+    const searchEnd =
+      Math.min(
+        articleWordElements.length,
+        referenceCursor + 10
+      );
 
     for (
-      let index = referenceIndex;
-      index < searchLimit;
+      let index = referenceCursor;
+      index < searchEnd;
       index++
     ) {
       const referenceWord =
         articleWordElements[index]
-          .dataset.normalizedWord || '';
+          ?.dataset
+          ?.normalizedWord || '';
+
+      if (!referenceWord) continue;
+
+      if (referenceWord === spokenWord) {
+        matchedIndex = index;
+        bestSimilarity = 1;
+        break;
+      }
+
+      const similarity =
+        thaiWordSimilarity(
+          spokenWord,
+          referenceWord
+        );
 
       if (
-        referenceWord === spokenWord
+        similarity >= 0.82 &&
+        similarity > bestSimilarity
       ) {
-        foundIndex = index;
-        break;
+        bestSimilarity = similarity;
+        matchedIndex = index;
       }
     }
 
-    if (foundIndex !== -1) {
-      lastMatchedIndex = foundIndex;
-      referenceIndex = foundIndex + 1;
+    if (matchedIndex !== -1) {
+      newestMatchedIndex =
+        matchedIndex;
+
+      referenceCursor =
+        matchedIndex + 1;
     }
+  });
+
+  if (
+    newestMatchedIndex >
+    articleHighlightIndex
+  ) {
+    articleHighlightIndex =
+      newestMatchedIndex;
+
+    renderArticleWordHighlight();
   }
-
-  return lastMatchedIndex;
 }
-function updateArticleWordHighlight(
-  spokenText
-) {
-  const matchedIndex =
-    findArticleWordPosition(
-      spokenText
-    );
-
-  if (matchedIndex < 0) return;
-
-  /*
-   * ไม่ให้ตำแหน่งไฮไลต์ย้อนกลับ
-   */
-  articleHighlightIndex =
-    Math.max(
-      articleHighlightIndex,
-      matchedIndex
-    );
-
+function renderArticleWordHighlight() {
   articleWordElements.forEach(
     (element, index) => {
       element.classList.remove(
@@ -1366,16 +1371,24 @@ function updateArticleWordHighlight(
         element.classList.add(
           'article-current'
         );
-
-        element.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
-          inline: 'nearest'
-        });
       }
     }
   );
+
+  const currentElement =
+    articleWordElements[
+      articleHighlightIndex
+    ];
+
+  if (currentElement) {
+    currentElement.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+      inline: 'nearest'
+    });
+  }
 }
+
 function stopContinuousArticleAssessment() {
   if (!articleRecognizer) {
     Swal.fire({
