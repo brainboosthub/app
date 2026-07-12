@@ -471,3 +471,37 @@ input:focus {
   color: #12845e;
   font-size: 27px;
 }
+/* ตัวอักษรบทความก่อนอ่าน */
+.article-reading-char {
+  color: inherit;
+  border-radius: 3px;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+/* ส่วนที่อ่านผ่านแล้ว */
+.article-reading-char.article-read {
+  color: #12845e;
+}
+
+/* ตำแหน่งที่กำลังอ่าน */
+.article-reading-char.article-current {
+  color: #111827;
+  background: #fde68a;
+  box-shadow: 0 0 0 2px #fde68a;
+  font-weight: 700;
+}
+
+/* คำเป้าหมายยังคงขีดเส้นใต้ */
+.article-content [data-target] {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+/* คำเป้าหมายที่อ่านผ่านแล้ว */
+.article-content [data-target]
+.article-reading-char.article-read {
+  color: #059669;
+}
