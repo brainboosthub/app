@@ -35,7 +35,12 @@ let articleRecognitionResults = [];
 let articleAssessmentInProgress = false;
 let articleFinalizeStarted = false;
 let articleAttempt = 1;
-
+/* ติดตามตำแหน่งการอ่านบทความ */
+let articleLiveTranscript = '';
+let articleConfirmedTranscript = '';
+let articleCharElements = [];
+let articleNormalizedReference = '';
+let articleHighlightIndex = -1;
 /* =========================================================
    INITIALIZATION
 ========================================================= */
@@ -232,7 +237,7 @@ function startArticleTest() {
   articleAssessmentInProgress = false;
   articleFinalizeStarted = false;
   articleAttempt = 1;
-
+prepareArticleReadingHighlight();
   resetArticleContinuousUI();
   showView('articleView');
 }
@@ -945,43 +950,82 @@ function beginContinuousArticleAzure(auth) {
 
   pronunciationConfig.applyTo(articleRecognizer);
 
-  articleRecognizer.recognizing = () => {
-    setText(
-      'articleStatusText',
-      'กำลังฟัง กรุณาอ่านบทความต่อเนื่องจนจบ'
+articleRecognizer.recognizing = (
+  sender,
+  event
+) => {
+  articleLiveTranscript =
+    String(
+      event?.result?.text || ''
     );
-  };
 
-  articleRecognizer.recognized = (
-    sender,
-    event
-  ) => {
-    if (
-      event.result.reason !==
-      SpeechSDK.ResultReason.RecognizedSpeech
-    ) {
-      return;
-    }
+  const fullTranscript =
+    (
+      articleConfirmedTranscript +
+      ' ' +
+      articleLiveTranscript
+    ).trim();
 
-    const jsonText =
-      event.result.properties.getProperty(
-        SpeechSDK.PropertyId
-          .SpeechServiceResponse_JsonResult
-      );
+  updateArticleReadingHighlight(
+    fullTranscript
+  );
 
-    if (!jsonText) return;
+  setText(
+    'articleStatusText',
+    'กำลังฟังและติดตามตำแหน่งการอ่าน...'
+  );
+};
 
-    try {
-      articleRecognitionResults.push(
-        JSON.parse(jsonText)
-      );
-    } catch (error) {
-      console.error(
-        'อ่านผล Azure JSON ไม่สำเร็จ',
-        error
-      );
-    }
-  };
+articleRecognizer.recognized = (
+  sender,
+  event
+) => {
+  if (
+    event.result.reason !==
+    SpeechSDK.ResultReason.RecognizedSpeech
+  ) {
+    return;
+  }
+
+  const confirmedText =
+    String(
+      event?.result?.text || ''
+    ).trim();
+
+  if (confirmedText) {
+    articleConfirmedTranscript =
+      (
+        articleConfirmedTranscript +
+        ' ' +
+        confirmedText
+      ).trim();
+
+    articleLiveTranscript = '';
+
+    updateArticleReadingHighlight(
+      articleConfirmedTranscript
+    );
+  }
+
+  const jsonText =
+    event.result.properties.getProperty(
+      SpeechSDK.PropertyId
+        .SpeechServiceResponse_JsonResult
+    );
+
+  if (!jsonText) return;
+
+  try {
+    articleRecognitionResults.push(
+      JSON.parse(jsonText)
+    );
+  } catch (error) {
+    console.error(
+      'อ่านผล Azure JSON ไม่สำเร็จ',
+      error
+    );
+  }
+};
 
   articleRecognizer.canceled = (
     sender,
@@ -1422,7 +1466,101 @@ async function saveContinuousArticleResults(
     );
   }
 }
+function prepareArticleReadingHighlight() {
+  const container =
+    document.getElementById('articleContent');
 
+  if (!container) return;
+
+  /*
+   * ป้องกันการสร้าง span ซ้ำ เมื่อกลับเข้าระบบบทความอีกครั้ง
+   */
+  if (
+    container.dataset.highlightPrepared === 'true'
+  ) {
+    resetArticleReadingHighlight();
+    return;
+  }
+
+  const walker =
+    document.createTreeWalker(
+      container,
+      NodeFilter.SHOW_TEXT
+    );
+
+  const textNodes = [];
+
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+
+    if (node.nodeValue) {
+      textNodes.push(node);
+    }
+  }
+
+  let normalizedIndex = 0;
+
+  textNodes.forEach(textNode => {
+    const fragment =
+      document.createDocumentFragment();
+
+    Array.from(textNode.nodeValue).forEach(char => {
+      /*
+       * ช่องว่างและขึ้นบรรทัดใหม่คงไว้เหมือนเดิม
+       */
+      if (/\s/.test(char)) {
+        fragment.appendChild(
+          document.createTextNode(char)
+        );
+        return;
+      }
+
+      const span =
+        document.createElement('span');
+
+      span.className = 'article-reading-char';
+      span.textContent = char;
+
+      const normalizedChar =
+        normalizeArticleCharacter(char);
+
+      if (normalizedChar) {
+        span.dataset.readingIndex =
+          String(normalizedIndex);
+
+        span.dataset.normalizedChar =
+          normalizedChar;
+
+        normalizedIndex++;
+      }
+
+      fragment.appendChild(span);
+    });
+
+    textNode.parentNode.replaceChild(
+      fragment,
+      textNode
+    );
+  });
+
+  container.dataset.highlightPrepared =
+    'true';
+
+  articleCharElements = Array.from(
+    container.querySelectorAll(
+      '.article-reading-char[data-reading-index]'
+    )
+  );
+
+  articleNormalizedReference =
+    articleCharElements
+      .map(element =>
+        element.dataset.normalizedChar || ''
+      )
+      .join('');
+
+  resetArticleReadingHighlight();
+}
 function showArticleSummary() {
   closeArticleRecognizer();
   showView('summaryView');
@@ -1461,7 +1599,15 @@ function showArticleSummary() {
     `;
   }
 }
-
+function normalizeArticleCharacter(value) {
+  return String(value || '')
+    .normalize('NFC')
+    .replace(
+      /[\s.,!?;:"'“”‘’()（）[\]{}<>ฯๆ]/g,
+      ''
+    )
+    .trim();
+}
 function resetArticleContinuousUI() {
   const circle =
     document.getElementById('articleMicCircle');
@@ -1509,7 +1655,121 @@ function closeArticleRecognizer(
 /* =========================================================
    MICROPHONE TEST
 ========================================================= */
+function resetArticleReadingHighlight() {
+  articleLiveTranscript = '';
+  articleConfirmedTranscript = '';
+  articleHighlightIndex = -1;
 
+  articleCharElements.forEach(element => {
+    element.classList.remove(
+      'article-read',
+      'article-current'
+    );
+  });
+}
+function findArticleReadingPosition(
+  spokenText
+) {
+  const spoken =
+    normalizeThaiWord(spokenText);
+
+  const reference =
+    articleNormalizedReference;
+
+  if (!spoken || !reference) {
+    return -1;
+  }
+
+  let referenceIndex = 0;
+  let lastMatchedIndex = -1;
+
+  /*
+   * ไล่จับคู่ตามลำดับ และยอมให้ Azure
+   * อ่านผิดหรือข้ามบางตัวอักษรได้เล็กน้อย
+   */
+  for (
+    let spokenIndex = 0;
+    spokenIndex < spoken.length;
+    spokenIndex++
+  ) {
+    const spokenChar =
+      spoken[spokenIndex];
+
+    let foundIndex = -1;
+
+    const searchLimit =
+      Math.min(
+        reference.length,
+        referenceIndex + 18
+      );
+
+    for (
+      let index = referenceIndex;
+      index < searchLimit;
+      index++
+    ) {
+      if (
+        reference[index] === spokenChar
+      ) {
+        foundIndex = index;
+        break;
+      }
+    }
+
+    if (foundIndex !== -1) {
+      lastMatchedIndex = foundIndex;
+      referenceIndex = foundIndex + 1;
+    }
+  }
+
+  return lastMatchedIndex;
+}
+function updateArticleReadingHighlight(
+  spokenText
+) {
+  const matchedIndex =
+    findArticleReadingPosition(
+      spokenText
+    );
+
+  if (matchedIndex < 0) return;
+
+  /*
+   * ไม่ให้แถบสีถอยกลับ
+   */
+  articleHighlightIndex =
+    Math.max(
+      articleHighlightIndex,
+      matchedIndex
+    );
+
+  articleCharElements.forEach(
+    (element, index) => {
+      element.classList.remove(
+        'article-current'
+      );
+
+      element.classList.toggle(
+        'article-read',
+        index < articleHighlightIndex
+      );
+
+      if (
+        index === articleHighlightIndex
+      ) {
+        element.classList.add(
+          'article-current'
+        );
+
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'center'
+        });
+      }
+    }
+  );
+}
 async function testMicrophoneOnly() {
   try {
     await requestMicrophonePermission();
