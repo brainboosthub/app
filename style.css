@@ -633,3 +633,175 @@ font-size:34px;
 }
 
 }
+/* =========================================================
+   หน้าเลือกแบบทดสอบ
+========================================================= */
+
+.menu-view {
+  min-height: 715px;
+}
+
+.menu-title-area {
+  text-align: center;
+  margin: 12px 0 18px;
+}
+
+.menu-title-area h2 {
+  margin: 0;
+  color: #111827;
+  font-size: clamp(28px, 5vw, 40px);
+  line-height: 1.25;
+  font-weight: 850;
+}
+
+.menu-total-score {
+  margin-top: 2px;
+  color: #111;
+  font-size: clamp(24px, 4.8vw, 36px);
+  line-height: 1.3;
+  font-weight: 850;
+}
+
+.menu-title-area p {
+  margin: 10px 0 0;
+  color: #183e70;
+  font-size: clamp(18px, 3.5vw, 25px);
+  font-weight: 800;
+}
+
+.test-menu-list {
+  width: min(100%, 520px);
+  margin: 16px auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 38px;
+}
+
+.test-menu-card {
+  width: 100%;
+  min-height: 174px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  border: 0;
+  border-radius: 25px;
+  padding: 26px 20px;
+
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: center;
+
+  box-shadow:
+    0 14px 28px rgba(32, 50, 70, 0.16);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
+
+  -webkit-tap-highlight-color: transparent;
+}
+
+.test-menu-card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 20px 34px rgba(32, 50, 70, 0.22);
+  filter: brightness(1.03);
+}
+
+.test-menu-card:active {
+  transform: scale(0.98);
+}
+
+.word-test-card {
+  background: #197fc1;
+}
+
+.article-test-card {
+  background: #138c64;
+}
+
+.test-menu-main {
+  display: block;
+  font-size: clamp(36px, 7vw, 55px);
+  line-height: 1.15;
+  font-weight: 500;
+}
+
+.test-menu-score {
+  display: block;
+  margin-top: 20px;
+  font-size: clamp(27px, 5.5vw, 39px);
+  line-height: 1.1;
+  font-weight: 400;
+}
+
+/* คอมพิวเตอร์ */
+@media (min-width: 769px) {
+  .menu-view {
+    padding: 30px 40px 70px;
+  }
+
+  .test-menu-list {
+    width: min(100%, 650px);
+  }
+
+  .test-menu-card {
+    min-height: 190px;
+  }
+}
+
+/* สมาร์ทโฟน */
+@media (max-width: 600px) {
+  .menu-view {
+    min-height: 710px;
+    padding: 20px 14px 55px;
+  }
+
+  .menu-title-area {
+    margin-top: 8px;
+  }
+
+  .test-menu-list {
+    width: calc(100% - 34px);
+    gap: 40px;
+    margin-top: 16px;
+  }
+
+  .test-menu-card {
+    min-height: 174px;
+    border-radius: 24px;
+    padding: 24px 12px;
+  }
+
+  .test-menu-main {
+    font-size: 42px;
+  }
+
+  .test-menu-score {
+    margin-top: 22px;
+    font-size: 32px;
+  }
+}
+
+/* หน้าจอมือถือขนาดเล็ก */
+@media (max-width: 390px) {
+  .test-menu-list {
+    width: calc(100% - 14px);
+  }
+
+  .test-menu-card {
+    min-height: 155px;
+  }
+
+  .test-menu-main {
+    font-size: 36px;
+  }
+
+  .test-menu-score {
+    font-size: 28px;
+  }
+}
