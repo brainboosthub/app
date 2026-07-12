@@ -505,3 +505,43 @@ input:focus {
 .article-reading-char.article-read {
   color: #059669;
 }
+.article-reading-word {
+  display: inline;
+  border-radius: 4px;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+/* คำที่อ่านผ่านแล้ว */
+.article-reading-word.article-read {
+  color: #12845e;
+}
+
+/* คำที่กำลังอ่าน */
+.article-reading-word.article-current {
+  color: #111827;
+  background: #fde68a;
+  box-shadow: 0 0 0 2px #fde68a;
+  font-weight: 700;
+}
+
+/* คำเป้าหมายยังขีดเส้นใต้ */
+.article-content [data-target] {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+/* คำเป้าหมายที่อ่านผ่าน */
+.article-content [data-target]
+.article-reading-word.article-read {
+  color: #059669;
+}
+
+/* ทำให้บทความเลื่อนตามได้ */
+.article-content {
+  max-height: 55vh;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
