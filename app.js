@@ -1642,11 +1642,22 @@ function findBestArticleTargetMatch(
           index - startIndex
         );
 
-      const candidateScore =
-        matchInfo.similarity * 100 +
-        averageAccuracy * 0.18 -
-        distance * 0.12 -
-        (wordCount - 1) * 0.04;
+const combinedErrorType =
+  getCombinedErrorType(group);
+
+const errorPenalty =
+  combinedErrorType === 'Omission'
+    ? 35
+    : combinedErrorType === 'Mispronunciation'
+      ? 8
+      : 0;
+
+const candidateScore =
+  matchInfo.similarity * 70 +
+  averageAccuracy * 0.30 -
+  distance * 0.12 -
+  (wordCount - 1) * 0.04 -
+  errorPenalty;
 
       const candidate = {
         startIndex: index,
@@ -1675,8 +1686,8 @@ function findBestArticleTargetMatch(
         accuracy:
           averageAccuracy,
 
-        errorType:
-          getCombinedErrorType(group),
+errorType:
+  combinedErrorType,
 
         candidateScore
       };
@@ -1693,12 +1704,14 @@ function findBestArticleTargetMatch(
        * ถ้าตรงแบบ 100% และอยู่ใกล้ตำแหน่งเริ่ม
        * ใช้ผลนี้ได้ทันที
        */
-      if (
-        matchInfo.similarity === 1 &&
-        distance <= 3
-      ) {
-        return candidate;
-      }
+if (
+  matchInfo.similarity === 1 &&
+  distance <= 3 &&
+  averageAccuracy > 0 &&
+  combinedErrorType !== 'Omission'
+) {
+  return candidate;
+}
     }
   }
 
@@ -2069,32 +2082,35 @@ function collectRecognizedArticleWords() {
         ? best.Words
         : [];
 
-    resultWords.forEach(wordItem => {
-      const rawWord =
-        String(wordItem?.Word || '').trim();
+resultWords.forEach(wordItem => {
+  const rawWord =
+    String(wordItem?.Word || '').trim();
 
-      output.push({
-        rawWord,
+  const normalizedWord =
+    normalizeThaiWord(rawWord);
 
-        word:
-          normalizeThaiWord(rawWord),
+  if (!normalizedWord) return;
 
-        accuracy:
-          safeScore(
-            wordItem
-              ?.PronunciationAssessment
-              ?.AccuracyScore
-          ),
+  output.push({
+    rawWord,
+    word: normalizedWord,
 
-        errorType:
-          String(
-            wordItem
-              ?.PronunciationAssessment
-              ?.ErrorType ||
-            'None'
-          )
-      });
-    });
+    accuracy:
+      safeScore(
+        wordItem
+          ?.PronunciationAssessment
+          ?.AccuracyScore
+      ),
+
+    errorType:
+      String(
+        wordItem
+          ?.PronunciationAssessment
+          ?.ErrorType ||
+        'None'
+      )
+  });
+});
   });
 console.table(
   output.map((item, index) => ({
