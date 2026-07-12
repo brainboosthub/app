@@ -889,16 +889,40 @@ function showWordSummary() {
   showView('summaryView');
 
   const totalPoint =
-    sumPoints(wordSystemPoints);
+    round1(sumPoints(wordSystemPoints));
 
   const averageScore =
     document.getElementById('averageScore');
 
-  if (averageScore) {
-    averageScore.textContent =
-      formatPoint(totalPoint) +
-      ` / ${WORD_SYSTEM_FULL_SCORE} คะแนน`;
-  }
+  if (!averageScore) return;
+
+  averageScore.innerHTML = `
+    <div class="summary-score-list single-score">
+
+      <div class="summary-score-row">
+        <span class="summary-score-label">
+          อ่านคำ
+        </span>
+
+        <span class="summary-score-value">
+          ${formatPoint(totalPoint)}
+          <small>/ ${WORD_SYSTEM_FULL_SCORE}</small>
+        </span>
+      </div>
+
+    </div>
+
+    <div class="summary-grand-total">
+      <span>รวม</span>
+
+      <strong>
+        ${formatPoint(totalPoint)}
+        <small>/ ${WORD_SYSTEM_FULL_SCORE}</small>
+      </strong>
+
+      <span>คะแนน</span>
+    </div>
+  `;
 }
 
 /* =========================================================
@@ -2391,27 +2415,46 @@ function showArticleSummary() {
   const averageScore =
     document.getElementById('averageScore');
 
-  if (averageScore) {
-    averageScore.innerHTML = `
-      <div>
-        อ่านคำ:
-        ${formatPoint(wordPoint)}
-        / ${WORD_SYSTEM_FULL_SCORE}
+  if (!averageScore) return;
+
+  averageScore.innerHTML = `
+    <div class="summary-score-list">
+
+      <div class="summary-score-row">
+        <span class="summary-score-label">
+          อ่านคำ
+        </span>
+
+        <span class="summary-score-value">
+          ${formatPoint(wordPoint)}
+          <small>/ ${WORD_SYSTEM_FULL_SCORE}</small>
+        </span>
       </div>
 
-      <div>
-        อ่านบทความ:
-        ${formatPoint(articlePoint)}
-        / ${ARTICLE_SYSTEM_FULL_SCORE}
+      <div class="summary-score-row">
+        <span class="summary-score-label">
+          อ่านบทความ
+        </span>
+
+        <span class="summary-score-value">
+          ${formatPoint(articlePoint)}
+          <small>/ ${ARTICLE_SYSTEM_FULL_SCORE}</small>
+        </span>
       </div>
 
-      <div style="margin-top:12px;">
-        รวม:
+    </div>
+
+    <div class="summary-grand-total">
+      <span>รวม</span>
+
+      <strong>
         ${formatPoint(grandTotal)}
-        / ${GRAND_TOTAL_FULL_SCORE} คะแนน
-      </div>
-    `;
-  }
+        <small>/ ${GRAND_TOTAL_FULL_SCORE}</small>
+      </strong>
+
+      <span>คะแนน</span>
+    </div>
+  `;
 }
 
 function resetArticleContinuousUI() {
