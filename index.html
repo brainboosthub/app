@@ -19,7 +19,7 @@
       <div class="hero-icon">ก</div>
       <div>
         <h1>ทดสอบการอ่านออกเสียงภาษาไทย(ประถมศึกษา)</h1>
-        <p>อ่านข้อความทีละคำให้ชัดเจน แล้วระบบจะประเมินผลให้ทันที</p>
+        <p>ทดสอบการอ่านคำและการอ่านบทความ ระบบจะวิเคราะห์และประเมินผลการออกเสียง</p>
       </div>
     </header>
 
@@ -74,7 +74,9 @@
         </div>
         <span id="studentLevel" class="level-pill"></span>
       </div>
-
+<div class="progress-track">
+    <div id="progressBar" class="progress-bar"></div>
+</div>
 <div id="counter" class="counter">คำที่ 1 จาก 20</div>
       <div id="wordText" class="word">กรรมการ</div>
       <div id="wordMeta" class="word-meta"></div>
@@ -99,31 +101,7 @@
   เมื่อพร้อม ให้กดไมโครโฟนแล้วอ่านคำที่แสดง
 </div>
 </div>
-      <div id="resultBox" class="result-box hidden">
-        <div class="main-score">
-          <span id="finalScore">0%</span>
-          <small id="finalStatus">—</small>
-        </div>
 
-        <div class="heard">
-        คำที่ประเมิน:
-        <strong id="recognizedText">—</strong>
-        </div>
-
-        <div class="score-grid">
-          <div><b id="accuracyScore">0</b><span>ความถูกต้อง</span></div>
-          <div><b id="pronunciationScore">0</b><span>การออกเสียง</span></div>
-          <div><b id="fluencyScore">0</b><span>ความคล่อง</span></div>
-          <div><b id="completenessScore">0</b><span>ความครบถ้วน</span></div>
-        </div>
-
-        <div class="actions">
-          <button id="retryBtn" class="btn secondary"
-                  onclick="retryCurrentWord()">อ่านอีกครั้ง</button>
-          <button id="nextBtn" class="btn success"
-                  onclick="nextWord()">คำถัดไป</button>
-        </div>
-      </div>
     </section>
 <section id="articleView" class="card hidden">
   <div class="student-bar">
@@ -226,15 +204,25 @@
       </button>
     </div>
 
-    <section id="summaryView" class="card summary hidden">
-      <div class="trophy">🏆</div>
-      <h2>ทำแบบทดสอบครบแล้ว</h2>
-<p>สรุปคะแนนการอ่านออกเสียง</p>
-<div id="averageScore" class="average">0 / 100 คะแนน</div>
-     <button class="btn primary" onclick="showView('menuView')">
-  กลับหน้าเลือกแบบทดสอบ
-</button>
-    </section>
+<section id="summaryView" class="card summary hidden">
+  <div class="trophy">🏆</div>
+
+  <h2>ทำแบบทดสอบครบแล้ว</h2>
+
+  <p>สรุปคะแนนการอ่านออกเสียง</p>
+
+  <div id="averageScore" class="average">
+    0 / 100 คะแนน
+  </div>
+
+  <button
+    type="button"
+    class="btn primary"
+    onclick="restartTest()"
+  >
+    กลับหน้าเลือกแบบทดสอบ
+  </button>
+</section>
   </main>
 
  <script src="app.js"></script>
