@@ -88,6 +88,8 @@ let currentArticleIndex = 0;
 let currentArticleAttempt = 1;
 let articleRecognizer = null;
 let articleAssessmentInProgress = false;
+let articleRecognitionResults = [];
+let articleFinalizeStarted = false;
 
 const MAX_ARTICLE_ATTEMPTS = 3;
 const WORD_SYSTEM_FULL_SCORE = 40;
@@ -146,71 +148,100 @@ showView('menuView');
   }
 }
 async function startArticleTest() {
-  const articleContent =
-    document.getElementById('articleContent');
-
-  if (!articleContent) {
-    Swal.fire({
-      icon: 'error',
-      title: 'ไม่พบส่วนบทความ',
-      text: 'ไม่พบ element id="articleContent" กรุณาตรวจสอบไฟล์ index.html'
-    });
-    return;
-  }
-
-  const targetElements =
-    articleContent.querySelectorAll('[data-target]');
-
-  console.log(
-    'จำนวนคำเป้าหมายที่พบ:',
-    targetElements.length
-  );
-
-  articleWords = Array.from(targetElements).map(
-    (element, index) => ({
-      articleWordId:
-        'A' + String(index + 1).padStart(3, '0'),
-
-      word: String(
-        element.getAttribute('data-target') ||
-        element.textContent ||
-        ''
-      ).trim(),
-
-      element
-    })
-  );
-
-  if (articleWords.length !== 20) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'จำนวนคำในบทความไม่ครบ',
-      html: `
-        พบคำเป้าหมาย
-        <b>${articleWords.length}</b> คำ
-        ต้องมีทั้งหมด <b>20</b> คำ
-        <br><br>
-        กรุณาตรวจสอบว่า GitHub Pages
-        โหลดไฟล์ index.html เวอร์ชันล่าสุด
-      `
-    });
-    return;
-  }
-
   document.getElementById('articleStudentName').textContent =
     student?.name || student?.studentId || '—';
 
   document.getElementById('articleStudentLevel').textContent =
     student?.level || '';
 
+  articleWords = Array.from(
+    document.querySelectorAll('#articleContent [data-target]')
+  ).map((element, index) => ({
+    articleWordId:
+      'A' + String(index + 1).padStart(3, '0'),
+
+    word: String(
+      element.getAttribute('data-target') ||
+      element.textContent ||
+      ''
+    ).trim(),
+
+    element
+  }));
+
+  if (articleWords.length !== 20) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'จำนวนคำในบทความไม่ครบ',
+      text:
+        `พบคำเป้าหมาย ${articleWords.length} คำ ` +
+        'ต้องมีทั้งหมด 20 คำ'
+    });
+    return;
+  }
+
   articleSystemPoints = [];
   articleRecognitionResults = [];
   articleAssessmentInProgress = false;
+  articleFinalizeStarted = false;
 
+  resetArticleContinuousUI();
   showView('articleView');
+}
+async function startContinuousArticleAssessment() {
+  if (articleAssessmentInProgress) return;
 
-  document.getElementById('articleStatusText').textContent =
-    'กดไมโครโฟน แล้วอ่านบทความทั้งหมดจนจบ จากนั้นกด “หยุดและประเมินผล”';
+  if (typeof SpeechSDK === 'undefined') {
+    Swal.fire({
+      icon: 'error',
+      title: 'โหลด Azure Speech SDK ไม่สำเร็จ',
+      text: 'กรุณารีเฟรชหน้าเว็บแล้วลองใหม่'
+    });
+    return;
+  }
+
+  if (
+    !navigator.mediaDevices ||
+    typeof navigator.mediaDevices.getUserMedia !== 'function'
+  ) {
+    Swal.fire({
+      icon: 'error',
+      title: 'เบราว์เซอร์ไม่รองรับไมโครโฟน'
+    });
+    return;
+  }
+
+  try {
+    document.getElementById('articleStatusText').textContent =
+      'กำลังขออนุญาตใช้ไมโครโฟน...';
+
+    const stream =
+      await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+
+    stream.getTracks().forEach(track => track.stop());
+
+    const auth = await callApi('getAzureToken', {
+      sessionToken
+    });
+
+    beginContinuousArticleAzure(auth);
+
+  } catch (error) {
+    articleAssessmentInProgress = false;
+    resetArticleContinuousUI();
+
+    Swal.fire({
+      icon: 'error',
+      title: 'ไม่สามารถเริ่มอ่านบทความได้',
+      text: error?.message || String(error)
+    });
+  }
 }
 async function startWordTest() {
   await loadWords();
@@ -251,6 +282,223 @@ async function loadWords() {
     setMicIcon(false);
     showError(error);
   }
+}
+function beginContinuousArticleAzure(auth) {
+  const articleElement =
+    document.getElementById('articleContent');
+
+  const referenceText = String(
+    articleElement?.textContent || ''
+  )
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!referenceText) {
+    throw new Error('ไม่พบข้อความบทความ');
+  }
+
+  if (!auth?.token || !auth?.region) {
+    throw new Error('ข้อมูล Azure Token ไม่สมบูรณ์');
+  }
+
+  articleRecognitionResults = [];
+  articleFinalizeStarted = false;
+  articleAssessmentInProgress = true;
+
+  const speechConfig =
+    SpeechSDK.SpeechConfig.fromAuthorizationToken(
+      auth.token,
+      auth.region
+    );
+
+  speechConfig.speechRecognitionLanguage = 'th-TH';
+  speechConfig.outputFormat =
+    SpeechSDK.OutputFormat.Detailed;
+
+  const audioConfig =
+    SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+
+  articleRecognizer =
+    new SpeechSDK.SpeechRecognizer(
+      speechConfig,
+      audioConfig
+    );
+
+  const pronunciationConfig =
+    new SpeechSDK.PronunciationAssessmentConfig(
+      referenceText,
+      SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
+      SpeechSDK.PronunciationAssessmentGranularity.Word,
+      false
+    );
+
+  pronunciationConfig.applyTo(articleRecognizer);
+
+  articleRecognizer.recognizing = () => {
+    document.getElementById('articleStatusText').textContent =
+      'กำลังฟัง กรุณาอ่านบทความต่อเนื่องจนจบ';
+  };
+
+  articleRecognizer.recognized = (sender, event) => {
+    if (
+      event.result.reason !==
+      SpeechSDK.ResultReason.RecognizedSpeech
+    ) {
+      return;
+    }
+
+    const jsonText =
+      event.result.properties.getProperty(
+        SpeechSDK.PropertyId
+          .SpeechServiceResponse_JsonResult
+      );
+
+    if (!jsonText) return;
+
+    try {
+      articleRecognitionResults.push(
+        JSON.parse(jsonText)
+      );
+    } catch (error) {
+      console.error(
+        'อ่านผล Azure JSON ไม่สำเร็จ',
+        error
+      );
+    }
+  };
+
+  articleRecognizer.canceled = (sender, event) => {
+    articleAssessmentInProgress = false;
+    resetArticleContinuousUI();
+
+    Swal.fire({
+      icon: 'error',
+      title: 'การวิเคราะห์ถูกยกเลิก',
+      text:
+        event.errorDetails ||
+        String(event.reason || '')
+    });
+  };
+
+  setArticleMicIcon(true);
+
+  document
+    .getElementById('articleMicCircle')
+    .classList.add('listening');
+
+  document
+    .getElementById('stopArticleBtn')
+    .classList.remove('hidden');
+
+  document.getElementById('articleStatusText').textContent =
+    'กำลังฟัง กรุณาอ่านบทความต่อเนื่องจนจบ';
+
+  articleRecognizer.startContinuousRecognitionAsync(
+    () => {},
+    error => {
+      articleAssessmentInProgress = false;
+      resetArticleContinuousUI();
+      showError(error);
+    }
+  );
+}
+
+function stopContinuousArticleAssessment() {
+  if (!articleRecognizer) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'ระบบยังไม่ได้เริ่มฟังเสียง'
+    });
+    return;
+  }
+
+  document.getElementById('articleStatusText').textContent =
+    'กำลังหยุดและประมวลผล...';
+
+  document
+    .getElementById('stopArticleBtn')
+    .classList.add('hidden');
+
+  articleRecognizer.stopContinuousRecognitionAsync(
+    () => {
+      if (articleRecognizer) {
+        try {
+          articleRecognizer.close();
+        } catch (error) {
+          console.error(error);
+        }
+
+        articleRecognizer = null;
+      }
+
+      articleAssessmentInProgress = false;
+      finalizeArticleAssessment();
+    },
+
+    error => {
+      articleAssessmentInProgress = false;
+      resetArticleContinuousUI();
+      showError(error);
+    }
+  );
+}
+function resetArticleContinuousUI() {
+  const circle =
+    document.getElementById('articleMicCircle');
+
+  if (circle) {
+    circle.classList.remove('listening');
+  }
+
+  setArticleMicIcon(false);
+
+  const stopButton =
+    document.getElementById('stopArticleBtn');
+
+  if (stopButton) {
+    stopButton.classList.add('hidden');
+  }
+
+  const status =
+    document.getElementById('articleStatusText');
+
+  if (status) {
+    status.textContent =
+      'กดไมโครโฟน แล้วอ่านบทความทั้งหมดจนจบ ' +
+      'จากนั้นกด “หยุดและประเมินผล”';
+  }
+}
+function finalizeArticleAssessment() {
+  if (articleFinalizeStarted) return;
+  articleFinalizeStarted = true;
+
+  resetArticleContinuousUI();
+
+  console.log(
+    'จำนวนช่วงผลเสียง:',
+    articleRecognitionResults.length
+  );
+
+  if (!articleRecognitionResults.length) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'ไม่พบผลการอ่าน',
+      text:
+        'ระบบยังไม่ได้รับข้อความจากเสียง ' +
+        'กรุณาอ่านให้ชัดเจนแล้วลองใหม่'
+    });
+
+    articleFinalizeStarted = false;
+    return;
+  }
+
+  Swal.fire({
+    icon: 'success',
+    title: 'รับเสียงบทความสำเร็จ',
+    text:
+      `ระบบได้รับผลเสียงทั้งหมด ` +
+      `${articleRecognitionResults.length} ช่วง`
+  });
 }
 function calculateArticlePoint(score) {
   score = Math.max(0, Math.min(100, Number(score) || 0));
