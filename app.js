@@ -1485,28 +1485,50 @@ function evaluateArticleTargetWords() {
     return [];
   }
 
-  return articleWords.map(target => {
-    const normalizedTarget =
-      normalizeThaiWord(target.word);
+  /*
+   * ตำแหน่งเริ่มค้นหาของคำเป้าหมายถัดไป
+   * ป้องกันการนำคำเสียงเดียวกันมาใช้ซ้ำ
+   */
+  let searchCursor = 0;
 
-    const exactMatches =
-      recognizedWords.filter(item =>
-        item.word === normalizedTarget
+  return articleWords.map(target => {
+    const match =
+      findBestArticleTargetMatch(
+        target.word,
+        recognizedWords,
+        searchCursor
       );
 
-    const bestMatch =
-      exactMatches.sort(
-        (a, b) =>
-          b.accuracy - a.accuracy
-      )[0];
+    if (!match) {
+      return {
+        articleWordId:
+          target.articleWordId,
+
+        referenceWord:
+          target.word,
+
+        recognizedWord: '',
+
+        accuracy: 0,
+        point: 0,
+        errorType: 'Omission',
+
+        matchedWords: [],
+        similarity: 0
+      };
+    }
+
+    /*
+     * คำเป้าหมายต่อไปค้นหาหลังคำที่จับคู่แล้ว
+     */
+    searchCursor =
+      Math.max(
+        searchCursor,
+        match.endIndex + 1
+      );
 
     const accuracy =
-      bestMatch
-        ? bestMatch.accuracy
-        : 0;
-
-    const point =
-      calculateArticlePoint(accuracy);
+      round2(match.accuracy);
 
     return {
       articleWordId:
@@ -1516,20 +1538,521 @@ function evaluateArticleTargetWords() {
         target.word,
 
       recognizedWord:
-        bestMatch?.rawWord || '',
+        match.rawText,
 
       accuracy,
 
-      point,
+      point:
+        calculateArticlePoint(accuracy),
 
       errorType:
-        bestMatch
-          ? bestMatch.errorType
-          : 'Omission'
+        match.errorType,
+
+      matchedWords:
+        match.matchedWords,
+
+      similarity:
+        match.similarity
     };
   });
 }
+function findBestArticleTargetMatch(
+  targetWord,
+  recognizedWords,
+  startIndex
+) {
+  const targetVariants =
+    getArticleTargetVariants(
+      targetWord
+    );
 
+  let bestMatch = null;
+
+  /*
+   * จำกัดช่วงค้นหาเพื่อไม่ให้คำเป้าหมาย
+   * กระโดดไปจับคำที่อยู่ไกลเกินไป
+   */
+  const maximumSearchDistance = 45;
+
+  const searchEnd =
+    Math.min(
+      recognizedWords.length,
+      startIndex + maximumSearchDistance
+    );
+
+  for (
+    let index = startIndex;
+    index < searchEnd;
+    index++
+  ) {
+    /*
+     * Azure อาจแบ่งคำประสมออกเป็น 1–4 คำ
+     */
+    for (
+      let wordCount = 1;
+      wordCount <= 4;
+      wordCount++
+    ) {
+      const endIndex =
+        index + wordCount - 1;
+
+      if (
+        endIndex >= recognizedWords.length
+      ) {
+        break;
+      }
+
+      const group =
+        recognizedWords.slice(
+          index,
+          endIndex + 1
+        );
+
+      const combinedWord =
+        group
+          .map(item => item.word)
+          .join('');
+
+      if (!combinedWord) continue;
+
+      const matchInfo =
+        compareArticleTargetVariants(
+          combinedWord,
+          targetVariants
+        );
+
+      if (!matchInfo.accepted) {
+        continue;
+      }
+
+      const averageAccuracy =
+        calculateRecognizedGroupAccuracy(
+          group
+        );
+
+      /*
+       * ให้ความสำคัญกับ:
+       * 1. ความเหมือนของคำ
+       * 2. คะแนนออกเสียง
+       * 3. ตำแหน่งที่ใกล้ cursor
+       */
+      const distance =
+        Math.max(
+          0,
+          index - startIndex
+        );
+
+      const candidateScore =
+        matchInfo.similarity * 100 +
+        averageAccuracy * 0.18 -
+        distance * 0.12 -
+        (wordCount - 1) * 0.04;
+
+      const candidate = {
+        startIndex: index,
+        endIndex,
+
+        rawText:
+          group
+            .map(item =>
+              item.rawWord
+            )
+            .join(' '),
+
+        normalizedText:
+          combinedWord,
+
+        matchedWords:
+          group.map(item =>
+            item.rawWord
+          ),
+
+        similarity:
+          round2(
+            matchInfo.similarity * 100
+          ),
+
+        accuracy:
+          averageAccuracy,
+
+        errorType:
+          getCombinedErrorType(group),
+
+        candidateScore
+      };
+
+      if (
+        !bestMatch ||
+        candidate.candidateScore >
+          bestMatch.candidateScore
+      ) {
+        bestMatch = candidate;
+      }
+
+      /*
+       * ถ้าตรงแบบ 100% และอยู่ใกล้ตำแหน่งเริ่ม
+       * ใช้ผลนี้ได้ทันที
+       */
+      if (
+        matchInfo.similarity === 1 &&
+        distance <= 3
+      ) {
+        return candidate;
+      }
+    }
+  }
+
+  return bestMatch;
+}
+function getArticleTargetVariants(
+  targetWord
+) {
+  const normalizedTarget =
+    normalizeThaiWord(targetWord);
+
+  const variants =
+    new Set([normalizedTarget]);
+
+  /*
+   * คำที่ Azure อาจได้ยินหรือแบ่งรูปคำต่างออกไป
+   * แต่ยังถือว่าเป็นคำเป้าหมายเดียวกัน
+   */
+  const aliasMap = {
+    'ฤดูร้อน': [
+      'ฤดูร้อน',
+      'ฤดูร้อน'
+    ],
+
+    'พระอาทิตย์': [
+      'พระอาทิตย์',
+      'อาทิตย์'
+    ],
+
+    'แผดเผา': [
+      'แผดเผา'
+    ],
+
+    'แห้งผาก': [
+      'แห้งผาก'
+    ],
+
+    'น้ำดื่ม': [
+      'น้ำดื่ม'
+    ],
+
+    'กระหายน้ำ': [
+      'กระหายน้ำ'
+    ],
+
+    'จนกระทั่ง': [
+      'จนกระทั่ง'
+    ],
+
+    'บ่อน้ำ': [
+      'บ่อน้ำ'
+    ],
+
+    'เหยือกน้ำ': [
+      'เหยือกน้ำ'
+    ],
+
+    'น้ำขัง': [
+      'น้ำขัง'
+    ],
+
+    'ปากยื่น': [
+      'ปากยื่น',
+      'ยื่น'
+    ],
+
+    'หิวน้ำ': [
+      'หิวน้ำ'
+    ],
+
+    'ก้อนหิน': [
+      'ก้อนหิน'
+    ],
+
+    'กินน้ำ': [
+      'กินน้ำ'
+    ]
+  };
+
+  const aliases =
+    aliasMap[normalizedTarget] || [];
+
+  aliases.forEach(alias => {
+    const normalizedAlias =
+      normalizeThaiWord(alias);
+
+    if (normalizedAlias) {
+      variants.add(
+        normalizedAlias
+      );
+    }
+  });
+
+  return Array.from(variants);
+}
+function compareArticleTargetVariants(
+  recognizedWord,
+  targetVariants
+) {
+  const recognized =
+    normalizeThaiWord(
+      recognizedWord
+    );
+
+  if (!recognized) {
+    return {
+      accepted: false,
+      similarity: 0
+    };
+  }
+
+  let bestSimilarity = 0;
+
+  targetVariants.forEach(variant => {
+    if (!variant) return;
+
+    let similarity = 0;
+
+    if (recognized === variant) {
+      similarity = 1;
+
+    } else {
+      similarity =
+        thaiWordSimilarity(
+          recognized,
+          variant
+        );
+
+      /*
+       * รองรับกรณี Azure ได้คำยาวกว่าหรือสั้นกว่า
+       * แต่ยังครอบคลุมคำเป้าหมาย
+       */
+      if (
+        recognized.length >= 4 &&
+        variant.length >= 4 &&
+        (
+          recognized.includes(variant) ||
+          variant.includes(recognized)
+        )
+      ) {
+        similarity =
+          Math.max(
+            similarity,
+            0.88
+          );
+      }
+    }
+
+    bestSimilarity =
+      Math.max(
+        bestSimilarity,
+        similarity
+      );
+  });
+
+  const shortestLength =
+    Math.min(
+      recognized.length,
+      ...targetVariants.map(
+        value => value.length
+      )
+    );
+
+  /*
+   * คำสั้นต้องเข้มงวดกว่า เพื่อป้องกันจับผิดคำ
+   */
+  let threshold = 0.78;
+
+  if (shortestLength <= 3) {
+    threshold = 0.96;
+
+  } else if (shortestLength <= 5) {
+    threshold = 0.86;
+  }
+
+  return {
+    accepted:
+      bestSimilarity >= threshold,
+
+    similarity:
+      bestSimilarity
+  };
+}
+function thaiWordSimilarity(
+  firstWord,
+  secondWord
+) {
+  const first =
+    normalizeThaiWord(firstWord);
+
+  const second =
+    normalizeThaiWord(secondWord);
+
+  if (!first || !second) {
+    return 0;
+  }
+
+  if (first === second) {
+    return 1;
+  }
+
+  const distance =
+    levenshteinDistance(
+      first,
+      second
+    );
+
+  const maximumLength =
+    Math.max(
+      first.length,
+      second.length
+    );
+
+  if (!maximumLength) {
+    return 1;
+  }
+
+  return Math.max(
+    0,
+    1 - distance / maximumLength
+  );
+}
+
+function levenshteinDistance(
+  first,
+  second
+) {
+  const rows =
+    second.length + 1;
+
+  const columns =
+    first.length + 1;
+
+  const matrix =
+    Array.from(
+      { length: rows },
+      () =>
+        new Array(columns).fill(0)
+    );
+
+  for (
+    let column = 0;
+    column < columns;
+    column++
+  ) {
+    matrix[0][column] = column;
+  }
+
+  for (
+    let row = 0;
+    row < rows;
+    row++
+  ) {
+    matrix[row][0] = row;
+  }
+
+  for (
+    let row = 1;
+    row < rows;
+    row++
+  ) {
+    for (
+      let column = 1;
+      column < columns;
+      column++
+    ) {
+      const substitutionCost =
+        first[column - 1] ===
+        second[row - 1]
+          ? 0
+          : 1;
+
+      matrix[row][column] =
+        Math.min(
+          matrix[row - 1][column] + 1,
+          matrix[row][column - 1] + 1,
+          matrix[row - 1][column - 1] +
+            substitutionCost
+        );
+    }
+  }
+
+  return matrix[rows - 1][columns - 1];
+}
+function calculateRecognizedGroupAccuracy(
+  group
+) {
+  const validScores =
+    group
+      .map(item =>
+        Number(item.accuracy)
+      )
+      .filter(score =>
+        Number.isFinite(score)
+      );
+
+  if (!validScores.length) {
+    return 0;
+  }
+
+  /*
+   * ใช้ค่าเฉลี่ย แต่ให้น้ำหนักกับคำที่คะแนนต่ำสุดเล็กน้อย
+   * เพื่อไม่ให้คำหนึ่งอ่านผิดมากแต่ยังได้คะแนนเต็ม
+   */
+  const average =
+    validScores.reduce(
+      (total, score) =>
+        total + score,
+      0
+    ) / validScores.length;
+
+  const minimum =
+    Math.min(...validScores);
+
+  return round2(
+    average * 0.8 +
+    minimum * 0.2
+  );
+}
+
+function getCombinedErrorType(group) {
+  const errorTypes =
+    group.map(item =>
+      String(
+        item.errorType || 'None'
+      )
+    );
+
+  if (
+    errorTypes.some(type =>
+      type === 'Omission'
+    )
+  ) {
+    return 'Omission';
+  }
+
+  if (
+    errorTypes.some(type =>
+      type === 'Mispronunciation'
+    )
+  ) {
+    return 'Mispronunciation';
+  }
+
+  if (
+    errorTypes.some(type =>
+      type === 'Insertion'
+    )
+  ) {
+    return 'Insertion';
+  }
+
+  return 'None';
+}
 function collectRecognizedArticleWords() {
   const output = [];
 
@@ -1573,7 +2096,15 @@ function collectRecognizedArticleWords() {
       });
     });
   });
-
+console.table(
+  output.map((item, index) => ({
+    index,
+    word: item.rawWord,
+    normalized: item.word,
+    accuracy: item.accuracy,
+    errorType: item.errorType
+  }))
+);
   return output;
 }
 
