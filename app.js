@@ -854,6 +854,9 @@ async function startContinuousArticleAssessment() {
     }
   }
 
+  // เริ่มการอ่านใหม่ ให้สีเริ่มจากต้นบทความ
+  resetArticleWordHighlight();
+
   try {
     setText(
       'articleStatusText',
@@ -862,9 +865,10 @@ async function startContinuousArticleAssessment() {
 
     await requestMicrophonePermission();
 
-    const auth = await callApi('getAzureToken', {
-      sessionToken
-    });
+    const auth =
+      await callApi('getAzureToken', {
+        sessionToken
+      });
 
     beginContinuousArticleAzure(auth);
 
@@ -875,7 +879,9 @@ async function startContinuousArticleAssessment() {
     Swal.fire({
       icon: 'error',
       title: 'ไม่สามารถเริ่มอ่านบทความได้',
-      text: error?.message || String(error)
+      text:
+        error?.message ||
+        String(error)
     });
   }
 }
@@ -1095,12 +1101,15 @@ function prepareArticleWordHighlight() {
 
   if (!container) return;
 
-  /*
-   * ป้องกันการสร้าง span ซ้ำ
-   */
   if (
     container.dataset.wordHighlightPrepared === 'true'
   ) {
+    articleWordElements = Array.from(
+      container.querySelectorAll(
+        '.article-reading-word'
+      )
+    );
+
     resetArticleWordHighlight();
     return;
   }
@@ -1124,36 +1133,88 @@ function prepareArticleWordHighlight() {
     }
   }
 
+  const segmenter =
+    typeof Intl !== 'undefined' &&
+    typeof Intl.Segmenter === 'function'
+      ? new Intl.Segmenter('th', {
+          granularity: 'word'
+        })
+      : null;
+
   textNodes.forEach(textNode => {
     const fragment =
       document.createDocumentFragment();
 
-    const parts =
-      textNode.nodeValue.split(/(\s+)/);
+    const originalText =
+      textNode.nodeValue;
 
-    parts.forEach(part => {
-      if (!part) return;
-
-      if (/^\s+$/.test(part)) {
-        fragment.appendChild(
-          document.createTextNode(part)
+    if (segmenter) {
+      const segments =
+        Array.from(
+          segmenter.segment(originalText)
         );
-        return;
-      }
 
-      const span =
-        document.createElement('span');
+      segments.forEach(segmentInfo => {
+        const text =
+          segmentInfo.segment;
 
-      span.className =
-        'article-reading-word';
+        if (!text) return;
 
-      span.textContent = part;
+        if (
+          !segmentInfo.isWordLike ||
+          /^\s+$/.test(text)
+        ) {
+          fragment.appendChild(
+            document.createTextNode(text)
+          );
+          return;
+        }
 
-      span.dataset.normalizedWord =
-        normalizeThaiWord(part);
+        const span =
+          document.createElement('span');
 
-      fragment.appendChild(span);
-    });
+        span.className =
+          'article-reading-word';
+
+        span.textContent = text;
+
+        span.dataset.normalizedWord =
+          normalizeThaiWord(text);
+
+        fragment.appendChild(span);
+      });
+
+    } else {
+      /*
+       * Fallback สำหรับเบราว์เซอร์เก่า
+       * จะแบ่งตามช่องว่าง
+       */
+      originalText
+        .split(/(\s+)/)
+        .forEach(part => {
+          if (!part) return;
+
+          if (/^\s+$/.test(part)) {
+            fragment.appendChild(
+              document.createTextNode(part)
+            );
+            return;
+          }
+
+          const span =
+            document.createElement('span');
+
+          span.className =
+            'article-reading-word';
+
+          span.textContent = part;
+
+          span.dataset.normalizedWord =
+            normalizeThaiWord(part);
+
+          fragment.appendChild(span);
+        });
+    }
 
     textNode.parentNode.replaceChild(
       fragment,
@@ -1213,11 +1274,11 @@ function findArticleWordPosition(spokenText) {
 
     let foundIndex = -1;
 
-    const searchLimit =
-      Math.min(
-        articleWordElements.length,
-        referenceIndex + 12
-      );
+const searchLimit =
+  Math.min(
+    articleWordElements.length,
+    referenceIndex + 30
+  );
 
     for (
       let index = referenceIndex;
