@@ -239,111 +239,13 @@ input:focus {
     transform: none !important;
     box-shadow: none !important;
 }
-.popup-result {
-  text-align: center;
-}
 
-.popup-score {
-  font-size: 54px;
-  line-height: 1;
-  font-weight: 800;
-  color: #12845e;
-  margin-bottom: 8px;
-}
-
-.popup-status {
-  color: #66798b;
-  margin-bottom: 18px;
-}
-
-.popup-word {
-  padding: 12px;
-  margin-bottom: 16px;
-  border-radius: 12px;
-  background: #f4f8fb;
-}
-
-.popup-score-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-}
-
-.popup-score-grid > div {
-  padding: 13px 6px;
-  border-radius: 12px;
-  background: #f4f8fb;
-}
-
-.popup-score-grid b {
-  display: block;
-  font-size: 22px;
-  color: #196da5;
-}
-
-.popup-score-grid span {
-  display: block;
-  margin-top: 4px;
-  font-size: 12px;
-  color: #718094;
-}
-
-@media (max-width: 600px) {
-  .popup-score-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-.popup-point-summary {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin: 16px 0;
-}
-
-.popup-current-point,
-.popup-accumulated-point {
-  min-width: 125px;
-  padding: 12px 16px;
-  border-radius: 14px;
-  background: #f2f7fb;
-  text-align: center;
-}
-
-.popup-current-point b,
-.popup-accumulated-point b {
-  display: block;
-  color: #16845f;
-  font-size: 25px;
-  line-height: 1.1;
-}
-
-.popup-accumulated-point b {
-  color: #e53935;
-}
-
-.popup-accumulated-point small {
-  font-size: 15px;
-  color: #718094;
-}
-
-.popup-current-point span,
-.popup-accumulated-point span {
-  display: block;
-  margin-top: 5px;
-  color: #718094;
-  font-size: 12px;
-}
 
 @media (max-width: 480px) {
   .popup-point-summary {
     gap: 8px;
   }
 
-  .popup-current-point,
-  .popup-accumulated-point {
-    min-width: 110px;
-    padding: 11px 8px;
-  }
 }
 .popup-result {
   text-align: center;
@@ -471,40 +373,12 @@ input:focus {
   color: #12845e;
   font-size: 27px;
 }
-/* ตัวอักษรบทความก่อนอ่าน */
-.article-reading-char {
-  color: inherit;
-  border-radius: 3px;
-  transition:
-    color 0.2s ease,
-    background-color 0.2s ease;
-}
 
-/* ส่วนที่อ่านผ่านแล้ว */
-.article-reading-char.article-read {
-  color: #12845e;
-}
 
-/* ตำแหน่งที่กำลังอ่าน */
-.article-reading-char.article-current {
-  color: #111827;
-  background: #fde68a;
-  box-shadow: 0 0 0 2px #fde68a;
-  font-weight: 700;
-}
 
-/* คำเป้าหมายยังคงขีดเส้นใต้ */
-.article-content [data-target] {
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 4px;
-}
 
-/* คำเป้าหมายที่อ่านผ่านแล้ว */
-.article-content [data-target]
-.article-reading-char.article-read {
-  color: #059669;
-}
+
+
 .article-reading-word {
   display: inline;
   border-radius: 4px;
@@ -526,18 +400,8 @@ input:focus {
   font-weight: 700;
 }
 
-/* คำเป้าหมายยังขีดเส้นใต้ */
-.article-content [data-target] {
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 4px;
-}
 
-/* คำเป้าหมายที่อ่านผ่าน */
-.article-content [data-target]
-.article-reading-word.article-read {
-  color: #059669;
-}
+
 
 /* ทำให้บทความเลื่อนตามได้ */
 .article-content {
