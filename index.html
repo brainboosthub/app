@@ -33,6 +33,7 @@
       <p class="hint">รหัสทดลองเริ่มต้น: 6901000001</p>
     </section>
 <section id="menuView" class="card hidden">
+
   <div class="student-bar">
     <div>
       <span class="muted">ผู้ทดสอบ</span>
@@ -44,27 +45,85 @@
     </span>
   </div>
 
-  <h2 style="text-align:center;">
-    เลือกระบบทดสอบ
-  </h2>
+  <div class="menu-header">
 
-  <button
-    type="button"
-    class="btn primary test-menu-btn"
-    onclick="startWordTest()"
-  >
-    อ่านคำ 20 คำ
-    <small>คะแนนเต็ม 40 คะแนน</small>
-  </button>
+    <h1>
+      อ่านออกเสียง
+    </h1>
 
-  <button
-    type="button"
-    class="btn success test-menu-btn"
-    onclick="startArticleTest()"
-  >
-    อ่านบทความ กากับเหยือกน้ำ
-    <small>คะแนนเต็ม 60 คะแนน</small>
-  </button>
+    <h2>
+      คะแนนเต็ม
+      <span>100</span>
+      คะแนน
+    </h2>
+
+    <p>
+      เลือกระบบที่ต้องการทดสอบ
+    </p>
+
+  </div>
+
+  <div class="menu-grid">
+
+    <div
+      class="test-card word-card"
+      onclick="startWordTest()"
+    >
+
+      <div class="test-icon">
+        📖
+      </div>
+
+      <div class="test-title">
+        อ่านคำ
+      </div>
+
+      <div class="test-count">
+        20 คำ
+      </div>
+
+      <div class="test-score">
+        40 คะแนน
+      </div>
+
+      <div class="test-desc">
+        อ่านทีละคำ
+        วิเคราะห์การออกเสียงทันที
+      </div>
+
+    </div>
+
+
+    <div
+      class="test-card article-card"
+      onclick="startArticleTest()"
+    >
+
+      <div class="test-icon">
+        📄
+      </div>
+
+      <div class="test-title">
+        อ่านบทความ
+      </div>
+
+      <div class="test-count">
+        กากับเหยือกน้ำ
+      </div>
+
+      <div class="test-score">
+        60 คะแนน
+      </div>
+
+      <div class="test-desc">
+        อ่านบทความต่อเนื่อง
+        วิเคราะห์คำสำคัญ 20 คำ
+      </div>
+
+    </div>
+
+  </div>
+
 </section>
     <section id="testView" class="card hidden">
       <div class="student-bar">
