@@ -103,98 +103,98 @@
 </div>
 
     </section>
-<section id="menuView" class="card hidden">
-
+<section id="articleView" class="card hidden">
   <div class="student-bar">
     <div>
       <span class="muted">ผู้ทดสอบ</span>
-      <strong id="menuStudentName">—</strong>
+      <strong id="articleStudentName">—</strong>
     </div>
 
-    <span class="level-pill">
-      เลือกแบบทดสอบ
+    <span
+      id="articleStudentLevel"
+      class="level-pill">
     </span>
   </div>
 
-  <div class="menu-header">
-
-    <h1>
-      อ่านออกเสียง
-    </h1>
-
-    <h2>
-      คะแนนเต็ม
-      <span>100</span>
-      คะแนน
-    </h2>
-
-    <p>
-      เลือกระบบที่ต้องการทดสอบ
-    </p>
-
+  <div id="articleCounter" class="counter">
+    ระบบจะประเมินคำสำคัญ 20 คำภายในบทความ
   </div>
 
-  <div class="menu-grid">
+  <h2 class="article-title">กากับเหยือกน้ำ</h2>
 
-    <div
-      class="test-card word-card"
-      onclick="startWordTest()"
-    >
+<div
+  id="articleContent"
+  class="article-content"
+  tabindex="0"
+>
+  กาลครั้งหนึ่ง วันหนึ่งใน
+  <span data-target="ฤดูร้อน">ฤดูร้อน</span>
+  ที่มีอากาศร้อนจัด
+  <span data-target="พระอาทิตย์">พระอาทิตย์</span>
+  ได้ส่องแสง
+  <span data-target="แผดเผา">แผดเผา</span>
+  ไปทั่วทุกหนทุกแห่ง น้ำใน
+  <span data-target="ห้วย">ห้วย</span>
+  หนอง คลอง
+  <span data-target="บึง">บึง</span>
+  จึง
+  <span data-target="แห้งผาก">แห้งผาก</span>
+  จนไม่มีน้ำหลงเหลืออยู่เลย
 
-      <div class="test-icon">
-        📖
-      </div>
+  กาตัวหนึ่งได้พยายามบินหา
+  <span data-target="น้ำดื่ม">น้ำดื่ม</span>
+  ด้วยความ
+  <span data-target="กระหายน้ำ">กระหายน้ำ</span>
+  ไปทั่วทุกหนทุกแห่ง
+  <span data-target="จนกระทั่ง">จนกระทั่ง</span>
+  บินมาถึง
+  <span data-target="บ่อน้ำ">บ่อน้ำ</span>
+  แห่งหนึ่ง และเห็น
+  <span data-target="เหยือกน้ำ">เหยือกน้ำ</span>
+  ขนาดใหญ่ใบหนึ่งตั้งอยู่ ที่ก้นของเหยือกน้ำใบนั้น กาเห็นว่ามี
+  <span data-target="น้ำขัง">น้ำขัง</span>
+  อยู่แต่กาไม่
+  <span data-target="สามารถ">สามารถ</span>
+  ที่จะเอาปาก
+  <span data-target="ยื่น">ยื่น</span>
+  ลงไปกินน้ำในเหยือกนั้นได้ ด้วยความ
+  <span data-target="โมโห">โมโห</span>
+  <span data-target="หิวน้ำ">หิวน้ำ</span>
+  กาจึงคาบ
+  <span data-target="ก้อนหิน">ก้อนหิน</span>
+  โยนใส่ในเหยือกน้ำ และ
+  <span data-target="สังเกต">สังเกต</span>
+  เห็นว่าน้ำในเหยือกเอ่อ ขึ้นมา ดังนั้นจึง
+  <span data-target="พยายาม">พยายาม</span>
+  คาบก้อนหินทีละก้อนใส่ในเหยือกน้ำจนน้ำสูงขึ้นมา จนถึงปากคอเหยือก ด้วยเหตุนี้ กาตัวนั้นจึงได้
+  <span data-target="กินน้ำ">กินน้ำ</span>
+  จนอิ่ม
+  นิทานเรื่องนี้สอนให้รู้ว่า ความพยายามอยู่ที่ไหน ความสำเร็จอยู่ที่นั่น
+</div>
 
-      <div class="test-title">
-        อ่านคำ
-      </div>
-
-      <div class="test-count">
-        20 คำ
-      </div>
-
-      <div class="test-score">
-        40 คะแนน
-      </div>
-
-      <div class="test-desc">
-        อ่านทีละคำ
-        วิเคราะห์การออกเสียงทันที
-      </div>
-
-    </div>
-
-
-    <div
-      class="test-card article-card"
-      onclick="startArticleTest()"
-    >
-
-      <div class="test-icon">
-        📄
-      </div>
-
-      <div class="test-title">
-        อ่านบทความ
-      </div>
-
-      <div class="test-count">
-        กากับเหยือกน้ำ
-      </div>
-
-      <div class="test-score">
-        60 คะแนน
-      </div>
-
-      <div class="test-desc">
-        อ่านบทความต่อเนื่อง
-        วิเคราะห์คำสำคัญ 20 คำ
-      </div>
-
-    </div>
-
+  <div
+    id="articleMicCircle"
+    class="mic-circle"
+    onclick="startContinuousArticleAssessment()"
+  >
+    <i
+      id="articleMicIcon"
+      class="fa fa-microphone-slash"
+    ></i>
   </div>
 
+  <div id="articleStatusText" class="status">
+    กดไมโครโฟน แล้วอ่านบทความทั้งหมดจนจบ จากนั้นกด "หยุดและประเมินผล"
+  </div>
+
+  <button
+    id="stopArticleBtn"
+    type="button"
+    class="btn danger hidden"
+    onclick="stopContinuousArticleAssessment()"
+  >
+    หยุดและประเมินผล
+  </button>
 </section>
     <div id="micTestArea" class="mic-test-area hidden">
       <button
