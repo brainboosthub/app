@@ -26,7 +26,7 @@ let currentAttempt = 1;
 let wordSystemPoints = [];
 let recognizer = null;
 let assessmentInProgress = false;
-
+let wordNoMatchCount = 0;
 /* ระบบที่ 2: อ่านบทความต่อเนื่อง */
 let articleWords = [];
 let articleSystemPoints = [];
@@ -324,7 +324,7 @@ function renderWord() {
     showWordSummary();
     return;
   }
-
+  wordNoMatchCount = 0;
   const percent =
     ((currentIndex + 1) / words.length) * 100;
 
@@ -422,7 +422,14 @@ async function startAssessment() {
       sessionToken
     });
 
-    beginAzureWordAssessment(auth);
+setText(
+  'statusText',
+  'เตรียมอ่าน...'
+);
+
+await delay(350);
+
+beginAzureWordAssessment(auth);
 
   } catch (error) {
     assessmentInProgress = false;
@@ -430,7 +437,11 @@ async function startAssessment() {
     showError(error);
   }
 }
-
+function delay(milliseconds) {
+  return new Promise(resolve => {
+    setTimeout(resolve, milliseconds);
+  });
+}
 function beginAzureWordAssessment(auth) {
   try {
     const item = words[currentIndex];
@@ -449,41 +460,69 @@ function beginAzureWordAssessment(auth) {
     speechConfig.outputFormat =
       SpeechSDK.OutputFormat.Detailed;
 
-    speechConfig.setProperty(
-      SpeechSDK.PropertyId
-        .SpeechServiceConnection_InitialSilenceTimeoutMs,
-      '5000'
-    );
+/*
+ * ให้เวลานักเรียนเตรียมตัวก่อนเริ่มอ่านมากขึ้น
+ */
+speechConfig.setProperty(
+  SpeechSDK.PropertyId
+    .SpeechServiceConnection_InitialSilenceTimeoutMs,
+  '8000'
+);
 
-    speechConfig.setProperty(
-      SpeechSDK.PropertyId
-        .SpeechServiceConnection_EndSilenceTimeoutMs,
-      '1200'
-    );
+/*
+ * รอหลังจบคำให้นานขึ้นเล็กน้อย
+ * ป้องกันระบบตัดเสียงท้ายคำเร็วเกินไป
+ */
+speechConfig.setProperty(
+  SpeechSDK.PropertyId
+    .SpeechServiceConnection_EndSilenceTimeoutMs,
+  '2200'
+);
 
-    const audioConfig =
-      SpeechSDK.AudioConfig
-        .fromDefaultMicrophoneInput();
+/*
+ * ป้องกันการแบ่งช่วงเสียงสั้นเกินไป
+ */
+speechConfig.setProperty(
+  SpeechSDK.PropertyId
+    .Speech_SegmentationSilenceTimeoutMs,
+  '1500'
+);
 
-    recognizer =
-      new SpeechSDK.SpeechRecognizer(
-        speechConfig,
-        audioConfig
-      );
+const audioConfig =
+  SpeechSDK.AudioConfig
+    .fromDefaultMicrophoneInput();
 
-    const pronunciationConfig =
-      new SpeechSDK.PronunciationAssessmentConfig(
-        item.word,
-        SpeechSDK
-          .PronunciationAssessmentGradingSystem
-          .HundredMark,
-        SpeechSDK
-          .PronunciationAssessmentGranularity
-          .Word,
-        true
-      );
+recognizer =
+  new SpeechSDK.SpeechRecognizer(
+    speechConfig,
+    audioConfig
+  );
 
-    pronunciationConfig.applyTo(recognizer);
+const phraseList =
+  SpeechSDK.PhraseListGrammar
+    .fromRecognizer(recognizer);
+
+phraseList.addPhrase(item.word);
+
+if (
+  typeof phraseList.setWeight === 'function'
+) {
+  phraseList.setWeight(2.0);
+}
+
+const pronunciationConfig =
+  new SpeechSDK.PronunciationAssessmentConfig(
+    item.word,
+    SpeechSDK
+      .PronunciationAssessmentGradingSystem
+      .HundredMark,
+    SpeechSDK
+      .PronunciationAssessmentGranularity
+      .Word,
+    true
+  );
+
+pronunciationConfig.applyTo(recognizer);
 
     const micCircle =
       document.getElementById('micCircle');
@@ -580,18 +619,44 @@ function handleWordRecognition(result) {
     return;
   }
 
-  if (
-    result.reason ===
-    SpeechSDK.ResultReason.NoMatch
-  ) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'ไม่ได้ยินเสียงชัดเจน',
-      text:
-        'กรุณาเข้าใกล้ไมโครโฟนและอ่านอีกครั้ง'
-    });
+if (
+  result.reason ===
+  SpeechSDK.ResultReason.NoMatch
+) {
+  wordNoMatchCount++;
+
+  /*
+   * ครั้งแรกยังไม่เปิด Pop-up
+   * ให้แสดงข้อความใต้ไมค์เพื่อไม่รบกวนผู้เรียน
+   */
+  if (wordNoMatchCount === 1) {
+    setText(
+      'statusText',
+      'ระบบยังจับเสียงไม่ได้ กรุณากดไมโครโฟนแล้วอ่านอีกครั้งให้ชัดเจน'
+    );
+
+    setButton(
+      document.getElementById('recordBtn'),
+      false,
+      'กดไมโครโฟนเพื่ออ่านอีกครั้ง'
+    );
+
+    setMicIcon(false);
     return;
   }
+
+  /*
+   * ค่อยแสดง Pop-up เมื่อไม่พบเสียงซ้ำ
+   */
+  Swal.fire({
+    icon: 'warning',
+    title: 'ยังไม่ได้ยินเสียงชัดเจน',
+    text:
+      'กรุณาเข้าใกล้ไมโครโฟน อ่านหลังจากไอคอนไมโครโฟนเริ่มกระพริบ และอ่านให้จบคำ'
+  });
+
+  return;
+}
 
   if (
     result.reason ===
