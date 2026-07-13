@@ -1062,3 +1062,26 @@ font-size:34px;
     font-size: 29px;
   }
 }
+/* =========================================================
+   ปุ่มแบบทดสอบที่ยังใช้งานไม่ได้
+========================================================= */
+
+.test-menu-card:disabled,
+.test-menu-card.test-menu-disabled {
+  opacity: 0.34;
+  filter: grayscale(0.35);
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none;
+  box-shadow:
+    0 8px 18px rgba(32, 50, 70, 0.08);
+}
+
+/* ป้องกัน hover ทำงานเมื่อปุ่มถูกปิด */
+.test-menu-card:disabled:hover,
+.test-menu-card.test-menu-disabled:hover {
+  transform: none;
+  filter: grayscale(0.35);
+  box-shadow:
+    0 8px 18px rgba(32, 50, 70, 0.08);
+}
