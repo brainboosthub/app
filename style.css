@@ -1085,3 +1085,27 @@ font-size:34px;
   box-shadow:
     0 8px 18px rgba(32, 50, 70, 0.08);
 }
+.summary-continue-btn {
+  min-width: 280px;
+  min-height: 58px;
+  margin: 0 auto 22px;
+  padding: 14px 24px;
+
+  border: 0;
+  border-radius: 15px;
+
+  color: #fff;
+  background: #138c64;
+
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 700;
+
+  cursor: pointer;
+  box-shadow:
+    0 10px 22px rgba(19, 140, 100, 0.22);
+}
+
+.summary-continue-btn:hover {
+  transform: translateY(-2px);
+}
