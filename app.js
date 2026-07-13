@@ -298,12 +298,9 @@ async function login() {
 async function startWordTest() {
   await loadWords();
 }
-function showSavedWordSummary() {
+function renderIncompleteWordSummary(wordPoint) {
   showView('summaryView');
 
-  /*
-   * เปลี่ยนข้อความใต้ถ้วยรางวัล
-   */
   const summaryTitle =
     document.querySelector(
       '#summaryView .summary-title'
@@ -340,7 +337,7 @@ function showSavedWordSummary() {
         </span>
 
         <span class="summary-score-value">
-          ${formatPoint(savedWordPoint)}
+          ${formatPoint(wordPoint)}
           <small>
             / ${WORD_SYSTEM_FULL_SCORE}
           </small>
@@ -353,7 +350,7 @@ function showSavedWordSummary() {
       <span>รวม</span>
 
       <strong>
-        ${formatPoint(savedWordPoint)}
+        ${formatPoint(wordPoint)}
         <small>
           / ${WORD_SYSTEM_FULL_SCORE}
         </small>
@@ -365,19 +362,18 @@ function showSavedWordSummary() {
     <button
       type="button"
       class="summary-continue-btn"
-      onclick="goToArticleFromHistory()"
+      onclick="continueToArticleTest()"
     >
       ทำแบบทดสอบอ่านบทความ
     </button>
   `;
 }
-function goToArticleFromHistory() {
-  wordTestCompleted = true;
-  articleTestCompleted = false;
-
-  updateTestMenuState();
-  showView('menuView');
+function showSavedWordSummary() {
+  renderIncompleteWordSummary(
+    savedWordPoint
+  );
 }
+
 function showSavedFullSummary() {
   showView('summaryView');
 
@@ -1226,69 +1222,34 @@ function showWordSummary() {
 
   /*
    * อ่านคำครบแล้ว
-   * ปิดปุ่มอ่านคำและเปิดปุ่มอ่านบทความ
    */
   wordTestCompleted = true;
+  articleTestCompleted = false;
+
+  const totalPoint =
+    round1(
+      sumPoints(wordSystemPoints)
+    );
+
+  savedWordPoint = totalPoint;
+
   updateTestMenuState();
 
-  showView('summaryView');
-const summaryTitle =
-  document.querySelector(
-    '#summaryView .summary-title'
+  renderIncompleteWordSummary(
+    totalPoint
   );
-
-if (summaryTitle) {
-  summaryTitle.textContent =
-    'ทำแบบทดสอบยังไม่ครบ';
 }
+function continueToArticleTest() {
+  wordTestCompleted = true;
+  articleTestCompleted = false;
 
-const backButton =
-  document.querySelector(
-    '#summaryView .summary-back-btn'
-  );
+  updateTestMenuState();
 
-if (backButton) {
-  backButton.style.display = 'none';
-}
-  const totalPoint =
-    round1(sumPoints(wordSystemPoints));
-
-  const averageScore =
-    document.getElementById('averageScore');
-
-  if (!averageScore) return;
-
-  averageScore.innerHTML = `
-    <div class="summary-score-list single-score">
-
-      <div class="summary-score-row">
-        <span class="summary-score-label">
-          อ่านคำ
-        </span>
-
-        <span class="summary-score-value">
-          ${formatPoint(totalPoint)}
-          <small>
-            / ${WORD_SYSTEM_FULL_SCORE}
-          </small>
-        </span>
-      </div>
-
-    </div>
-
-    <div class="summary-grand-total">
-      <span>รวม</span>
-
-      <strong>
-        ${formatPoint(totalPoint)}
-        <small>
-          / ${WORD_SYSTEM_FULL_SCORE}
-        </small>
-      </strong>
-
-      <span>คะแนน</span>
-    </div>
-  `;
+  /*
+   * เปิดหน้าอ่านบทความโดยตรง
+   * ไม่ต้องผ่านหน้าเลือกแบบทดสอบ
+   */
+  startArticleTest();
 }
 /* =========================================================
    SYSTEM 2: CONTINUOUS ARTICLE READING
