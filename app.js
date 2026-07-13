@@ -27,6 +27,7 @@ let wordSystemPoints = [];
 let recognizer = null;
 let assessmentInProgress = false;
 let wordNoMatchCount = 0;
+let wordRecognitionTimer = null;
 let wordTestCompleted = false;
 let articleTestCompleted = false;
 
@@ -695,6 +696,20 @@ function renderWord() {
 }
 
 async function startAssessment() {
+    /*
+   * ถ้ากำลังฟังอยู่แล้ว
+   * กดไมโครโฟนซ้ำเพื่อยกเลิกการฟัง
+   */
+  if (assessmentInProgress) {
+    closeRecognizer();
+
+    setText(
+      'statusText',
+      'ยกเลิกการฟังแล้ว กรุณากดไมโครโฟนเพื่อเริ่มใหม่'
+    );
+
+    return;
+  }
   if (assessmentInProgress) return;
 
   if (!words[currentIndex]) {
@@ -758,6 +773,12 @@ function delay(milliseconds) {
   return new Promise(resolve => {
     setTimeout(resolve, milliseconds);
   });
+}
+function clearWordRecognitionTimer() {
+  if (wordRecognitionTimer) {
+    clearTimeout(wordRecognitionTimer);
+    wordRecognitionTimer = null;
+  }
 }
 function beginAzureWordAssessment(auth) {
   try {
@@ -887,25 +908,118 @@ pronunciationConfig.applyTo(recognizer);
       `กรุณาอ่านคำว่า “${item.word}”`
     );
 
-    recognizer.recognizeOnceAsync(
-      result => {
-        closeRecognizer();
-        assessmentInProgress = false;
-        handleWordRecognition(result);
-      },
+/*
+ * เก็บ recognizer ของรอบนี้ไว้
+ * ป้องกัน callback เก่ากระทบรอบใหม่
+ */
+const currentRecognizer = recognizer;
 
-      error => {
-        closeRecognizer();
-        assessmentInProgress = false;
-        resetRecorderUI();
+/*
+ * ถ้า Azure ไม่ตอบกลับภายใน 15 วินาที
+ * ให้หยุดและเปิดโอกาสให้อ่านใหม่
+ */
+clearWordRecognitionTimer();
 
-        Swal.fire({
-          icon: 'error',
-          title: 'วิเคราะห์เสียงไม่สำเร็จ',
-          text: String(error || 'เกิดข้อผิดพลาด')
-        });
-      }
+wordRecognitionTimer = setTimeout(() => {
+  if (
+    recognizer !== currentRecognizer ||
+    !assessmentInProgress
+  ) {
+    return;
+  }
+
+  clearWordRecognitionTimer();
+
+  try {
+    currentRecognizer.close();
+  } catch (error) {
+    console.error(
+      'ปิด recognizer หลังหมดเวลาไม่สำเร็จ',
+      error
     );
+  }
+
+  if (recognizer === currentRecognizer) {
+    recognizer = null;
+  }
+
+  assessmentInProgress = false;
+  resetRecorderUI();
+
+  setText(
+    'statusText',
+    'ระบบใช้เวลาฟังนานเกินไป กรุณากดไมโครโฟนแล้วอ่านอีกครั้ง'
+  );
+
+  setButton(
+    document.getElementById('recordBtn'),
+    false,
+    'กดไมโครโฟนเพื่ออ่านอีกครั้ง'
+  );
+
+  Swal.fire({
+    icon: 'warning',
+    title: 'ระบบยังไม่ได้รับผลเสียง',
+    text:
+      'กรุณากดไมโครโฟนใหม่ รอจนไอคอนไมโครโฟนเริ่มกระพริบ แล้วจึงอ่านคำ'
+  });
+}, 15000);
+
+currentRecognizer.recognizeOnceAsync(
+  result => {
+    clearWordRecognitionTimer();
+
+    /*
+     * ไม่รับผลจาก recognizer รอบเก่า
+     */
+    if (recognizer !== currentRecognizer) {
+      try {
+        currentRecognizer.close();
+      } catch (error) {
+        console.error(error);
+      }
+      return;
+    }
+
+    try {
+      currentRecognizer.close();
+    } catch (error) {
+      console.error(error);
+    }
+
+    recognizer = null;
+    assessmentInProgress = false;
+
+    handleWordRecognition(result);
+  },
+
+  error => {
+    clearWordRecognitionTimer();
+
+    if (recognizer === currentRecognizer) {
+      try {
+        currentRecognizer.close();
+      } catch (closeError) {
+        console.error(closeError);
+      }
+
+      recognizer = null;
+    }
+
+    assessmentInProgress = false;
+    resetRecorderUI();
+
+    Swal.fire({
+      icon: 'error',
+      title: 'วิเคราะห์เสียงไม่สำเร็จ',
+      text:
+        String(
+          error ||
+          'เกิดข้อผิดพลาด กรุณากดไมโครโฟนแล้วลองใหม่'
+        )
+    });
+  }
+);
 
   } catch (error) {
     closeRecognizer();
@@ -3086,6 +3200,8 @@ function resetRecorderUI() {
 }
 
 function closeRecognizer() {
+  clearWordRecognitionTimer();
+
   if (recognizer) {
     try {
       recognizer.close();
