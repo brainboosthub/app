@@ -1109,3 +1109,14 @@ font-size:34px;
 .summary-continue-btn:hover {
   transform: translateY(-2px);
 }
+.summary-not-tested {
+  color: #e00000;
+  font-size: clamp(22px, 4vw, 34px);
+  font-weight: 800;
+}
+
+.summary-not-tested small {
+  color: #111827;
+  font-size: 0.8em;
+  font-weight: 500;
+}
