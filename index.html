@@ -55,37 +55,40 @@
     <p>เลือกระบบทดสอบ</p>
   </div>
 
-  <div class="test-menu-list">
+<div class="test-menu-list">
 
-    <button
-      type="button"
-      class="test-menu-card word-test-card"
-      onclick="startWordTest()"
-    >
-      <span class="test-menu-main">
-        อ่านคำ 20 คำ
-      </span>
+  <button
+    id="wordTestMenuBtn"
+    type="button"
+    class="test-menu-card word-test-card"
+    onclick="startWordTest()"
+  >
+    <span class="test-menu-main">
+      อ่านคำ 20 คำ
+    </span>
 
-      <span class="test-menu-score">
-        40 คะแนน
-      </span>
-    </button>
+    <span class="test-menu-score">
+      40 คะแนน
+    </span>
+  </button>
 
-    <button
-      type="button"
-      class="test-menu-card article-test-card"
-      onclick="startArticleTest()"
-    >
-      <span class="test-menu-main">
-        อ่านบทความ
-      </span>
+  <button
+    id="articleTestMenuBtn"
+    type="button"
+    class="test-menu-card article-test-card"
+    onclick="startArticleTest()"
+    disabled
+  >
+    <span class="test-menu-main">
+      อ่านบทความ
+    </span>
 
-      <span class="test-menu-score">
-        60 คะแนน
-      </span>
-    </button>
+    <span class="test-menu-score">
+      60 คะแนน
+    </span>
+  </button>
 
-  </div>
+</div>
 
 </section>
     <section id="testView" class="card hidden">
