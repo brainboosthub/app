@@ -362,7 +362,7 @@ function renderIncompleteWordSummary(wordPoint) {
       <strong>
         ${formatPoint(wordPoint)}
         <small>
-          / ${GRAND_TOTAL_FULL_SCORE}
+          / ${WORD_SYSTEM_FULL_SCORE}
         </small>
       </strong>
 
