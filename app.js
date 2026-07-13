@@ -349,7 +349,7 @@ function renderIncompleteWordSummary(wordPoint) {
         <span class="summary-score-value summary-not-tested">
           ยังไม่ทดสอบ
           <small>
-            / 100
+            / ${ARTICLE_SYSTEM_FULL_SCORE}
           </small>
         </span>
       </div>
@@ -362,7 +362,7 @@ function renderIncompleteWordSummary(wordPoint) {
       <strong>
         ${formatPoint(wordPoint)}
         <small>
-          / ${WORD_SYSTEM_FULL_SCORE}
+          / ${GRAND_TOTAL_FULL_SCORE}
         </small>
       </strong>
 
