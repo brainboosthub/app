@@ -27,6 +27,7 @@ let wordSystemPoints = [];
 let recognizer = null;
 let assessmentInProgress = false;
 let wordNoMatchCount = 0;
+let wordTestCompleted = false;
 /* ระบบที่ 2: อ่านบทความต่อเนื่อง */
 let articleWords = [];
 let articleSystemPoints = [];
@@ -160,7 +161,15 @@ async function login() {
 
     sessionToken = result.sessionToken;
     student = result;
+/*
+ * เมื่อเข้าสู่ระบบใหม่
+ * ต้องเริ่มจากแบบอ่านคำก่อน
+ */
+wordTestCompleted = false;
+wordSystemPoints = [];
+articleSystemPoints = [];
 
+updateTestMenuState();
     setText(
       'studentName',
       result.name || result.studentId || '—'
@@ -176,7 +185,8 @@ async function login() {
       result.name || result.studentId || '—'
     );
 
-    showView('menuView');
+updateTestMenuState();
+showView('menuView');
 
   } catch (error) {
     setMicIcon(false);
@@ -192,6 +202,17 @@ async function startWordTest() {
 }
 
 function startArticleTest() {
+    if (!wordTestCompleted) {
+    Swal.fire({
+      icon: 'info',
+      title: 'กรุณาทำแบบอ่านคำก่อน',
+      text:
+        'ต้องทำแบบทดสอบอ่านคำ 20 คำให้ครบก่อน จึงจะเปิดแบบอ่านบทความได้'
+    });
+
+    updateTestMenuState();
+    return;
+  }
   setText(
     'articleStudentName',
     student?.name || student?.studentId || '—'
@@ -277,7 +298,41 @@ function showView(id) {
     );
   }
 }
+function updateTestMenuState() {
+  const wordButton =
+    document.getElementById('wordTestMenuBtn');
 
+  const articleButton =
+    document.getElementById('articleTestMenuBtn');
+
+  if (wordButton) {
+    /*
+     * เมื่ออ่านคำเสร็จแล้ว
+     * ปุ่มอ่านคำจะกดไม่ได้
+     */
+    wordButton.disabled =
+      wordTestCompleted;
+
+    wordButton.classList.toggle(
+      'test-menu-disabled',
+      wordTestCompleted
+    );
+  }
+
+  if (articleButton) {
+    /*
+     * ปุ่มอ่านบทความกดได้
+     * เมื่ออ่านคำครบแล้วเท่านั้น
+     */
+    articleButton.disabled =
+      !wordTestCompleted;
+
+    articleButton.classList.toggle(
+      'test-menu-disabled',
+      !wordTestCompleted
+    );
+  }
+}
 /* =========================================================
    SYSTEM 1: WORD TEST
 ========================================================= */
@@ -886,6 +941,14 @@ function nextWord() {
 
 function showWordSummary() {
   closeRecognizer();
+
+  /*
+   * อ่านคำครบแล้ว
+   * ปิดปุ่มอ่านคำและเปิดปุ่มอ่านบทความ
+   */
+  wordTestCompleted = true;
+  updateTestMenuState();
+
   showView('summaryView');
 
   const totalPoint =
@@ -906,7 +969,9 @@ function showWordSummary() {
 
         <span class="summary-score-value">
           ${formatPoint(totalPoint)}
-          <small>/ ${WORD_SYSTEM_FULL_SCORE}</small>
+          <small>
+            / ${WORD_SYSTEM_FULL_SCORE}
+          </small>
         </span>
       </div>
 
@@ -917,14 +982,15 @@ function showWordSummary() {
 
       <strong>
         ${formatPoint(totalPoint)}
-        <small>/ ${WORD_SYSTEM_FULL_SCORE}</small>
+        <small>
+          / ${WORD_SYSTEM_FULL_SCORE}
+        </small>
       </strong>
 
       <span>คะแนน</span>
     </div>
   `;
 }
-
 /* =========================================================
    SYSTEM 2: CONTINUOUS ARTICLE READING
 ========================================================= */
@@ -1833,63 +1899,75 @@ function getArticleTargetVariants(
    * แต่ยังถือว่าเป็นคำเป้าหมายเดียวกัน
    */
   const aliasMap = {
-    'ฤดูร้อน': [
-      'ฤดูร้อน',
-      'ฤดูร้อน'
+    'พลเมือง': [
+      'พลเมือง'
     ],
 
-    'พระอาทิตย์': [
-      'พระอาทิตย์',
-      'อาทิตย์'
+    'ความหมาย': [
+      'ความหมาย'
     ],
 
-    'แผดเผา': [
-      'แผดเผา'
+    'ประชาชน': [
+      'ประชาชน'
+    ],
+    'หมายถึง': [
+      'หมายถึง'
+    ],
+    'ทั่วไป': [
+       'ทั่วไป'
+    ],
+    'ดูดาย': [
+      'ดูดาย'
     ],
 
-    'แห้งผาก': [
-      'แห้งผาก'
+    'สำนึก': [
+      'สำนึก'
     ],
 
-    'น้ำดื่ม': [
-      'น้ำดื่ม'
+    'ครอบครัว': [
+      'ครอบครัว'
     ],
 
-    'กระหายน้ำ': [
-      'กระหายน้ำ'
+    'ประเทศชาติ': [
+      'ประเทศชาติ'
     ],
 
-    'จนกระทั่ง': [
-      'จนกระทั่ง'
+    'บ้านเมือง': [
+      'บ้านเมือง'
     ],
 
-    'บ่อน้ำ': [
-      'บ่อน้ำ'
+    'หน้าที่': [
+      'หน้าที่'
     ],
 
-    'เหยือกน้ำ': [
-      'เหยือกน้ำ'
+    'เคารพ': [
+      'เคารพ'
     ],
 
-    'น้ำขัง': [
-      'น้ำขัง'
+    'กฎหมาย': [
+      'กฎหมาย'
     ],
 
-    'ปากยื่น': [
-      'ปากยื่น',
-      'ยื่น'
+    'สิทธิ': [
+      'สิทธิ'
     ],
-
-    'หิวน้ำ': [
-      'หิวน้ำ'
+    'เลือกตั้ง': [
+      'เลือกตั้ง'
     ],
-
-    'ก้อนหิน': [
-      'ก้อนหิน'
+    'เสรีภาพ': [
+      'เสรีภาพ'
     ],
-
-    'กินน้ำ': [
-      'กินน้ำ'
+    'ศักดิ์ศรี': [
+      'ศักดิ์ศรี'
+    ],
+        'มนุษย์': [
+      'มนุษย์'
+    ],
+        'อนาคต': [
+      'อนาคต'
+    ],
+    'ประชาธิปไตย': [
+      'ประชาธิปไตย'
     ]
   };
 
@@ -2761,6 +2839,8 @@ function setArticleMicIcon(listening) {
 function restartTest() {
   closeRecognizer();
   closeArticleRecognizer();
+
+  updateTestMenuState();
   showView('menuView');
 }
 
