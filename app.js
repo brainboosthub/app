@@ -28,6 +28,10 @@ let recognizer = null;
 let assessmentInProgress = false;
 let wordNoMatchCount = 0;
 let wordTestCompleted = false;
+let articleTestCompleted = false;
+
+let savedWordPoint = 0;
+let savedArticlePoint = 0;
 /* ระบบที่ 2: อ่านบทความต่อเนื่อง */
 let articleWords = [];
 let articleSystemPoints = [];
@@ -132,47 +136,88 @@ function callApi(action, data = {}) {
 /* =========================================================
    LOGIN AND MENU
 ========================================================= */
+async function loadTestHistory() {
+  const history = await callApi('getTestHistory', {
+    sessionToken
+  });
 
+  wordTestCompleted =
+    Boolean(history?.wordCompleted);
+
+  articleTestCompleted =
+    Boolean(history?.articleCompleted);
+
+  savedWordPoint =
+    Number(history?.wordPoint) || 0;
+
+  savedArticlePoint =
+    Number(history?.articlePoint) || 0;
+
+  /*
+   * ใส่คะแนนเดิมไว้ในตัวแปรระบบ
+   * เพื่อใช้รวมคะแนนภายหลัง
+   */
+  if (wordTestCompleted) {
+    wordSystemPoints = [savedWordPoint];
+  }
+
+  if (articleTestCompleted) {
+    articleSystemPoints = [savedArticlePoint];
+  }
+
+  return history;
+}
 async function login() {
-  const input = document.getElementById('studentId');
-  const button = document.getElementById('loginBtn');
-  const id = String(input?.value || '').trim();
+  const input =
+    document.getElementById('studentId');
+
+  const button =
+    document.getElementById('loginBtn');
+
+  const id =
+    String(input?.value || '').trim();
 
   if (!id) {
     Swal.fire({
       icon: 'warning',
       title: 'กรุณากรอกรหัสนักศึกษา'
     });
+
     return;
   }
 
-  setButton(button, true, 'กำลังตรวจสอบ...');
+  setButton(
+    button,
+    true,
+    'กำลังตรวจสอบ...'
+  );
 
   try {
-    const result = await callApi('login', {
-      studentId: id
-    });
+    const result =
+      await callApi('login', {
+        studentId: id
+      });
 
     if (!result?.success) {
       throw new Error(
-        result?.message || 'ไม่พบข้อมูลนักศึกษา'
+        result?.message ||
+        'ไม่พบข้อมูลนักศึกษา'
       );
     }
 
-    sessionToken = result.sessionToken;
-    student = result;
-/*
- * เมื่อเข้าสู่ระบบใหม่
- * ต้องเริ่มจากแบบอ่านคำก่อน
- */
-wordTestCompleted = false;
-wordSystemPoints = [];
-articleSystemPoints = [];
+    sessionToken =
+      result.sessionToken;
 
-updateTestMenuState();
+    student = result;
+
+    /*
+     * แสดงชื่อนักศึกษาในทุกหน้าที่เกี่ยวข้อง
+     */
     setText(
       'studentName',
-      result.name || result.studentId || '—'
+      result.name ||
+      result.studentId ||
+      '—'
     );
 
     setText(
@@ -182,25 +227,181 @@ updateTestMenuState();
 
     setText(
       'menuStudentName',
-      result.name || result.studentId || '—'
+      result.name ||
+      result.studentId ||
+      '—'
     );
 
-updateTestMenuState();
-showView('menuView');
+    setText(
+      'articleStudentName',
+      result.name ||
+      result.studentId ||
+      '—'
+    );
+
+    setText(
+      'articleStudentLevel',
+      result.level || ''
+    );
+
+    /*
+     * ตรวจประวัติการทำแบบทดสอบ
+     */
+    const history =
+      await loadTestHistory();
+
+    updateTestMenuState();
+
+    /*
+     * เคยทำครบทั้งสองแบบ
+     * แสดงคะแนนสรุปทั้งหมด
+     */
+    if (
+      history.wordCompleted &&
+      history.articleCompleted
+    ) {
+      showSavedFullSummary();
+      return;
+    }
+
+    /*
+     * เคยทำเฉพาะอ่านคำ
+     * แสดงคะแนนอ่านคำ และปุ่มไปทำบทความ
+     */
+    if (
+      history.wordCompleted &&
+      !history.articleCompleted
+    ) {
+      showSavedWordSummary();
+      return;
+    }
+
+    /*
+     * ยังไม่เคยทำแบบทดสอบ
+     * แสดงหน้าเมนู โดยเปิดเฉพาะอ่านคำ
+     */
+    showView('menuView');
 
   } catch (error) {
     setMicIcon(false);
     showError(error);
 
   } finally {
-    setButton(button, false, 'เข้าสู่ระบบ');
+    setButton(
+      button,
+      false,
+      'เข้าสู่ระบบ'
+    );
   }
 }
 
 async function startWordTest() {
   await loadWords();
 }
+function showSavedWordSummary() {
+  showView('summaryView');
 
+  const averageScore =
+    document.getElementById('averageScore');
+
+  if (!averageScore) return;
+
+  averageScore.innerHTML = `
+    <div class="summary-score-list single-score">
+
+      <div class="summary-score-row">
+        <span class="summary-score-label">
+          อ่านคำ
+        </span>
+
+        <span class="summary-score-value">
+          ${formatPoint(savedWordPoint)}
+          <small>/ ${WORD_SYSTEM_FULL_SCORE}</small>
+        </span>
+      </div>
+
+    </div>
+
+    <div class="summary-grand-total">
+      <span>รวม</span>
+
+      <strong>
+        ${formatPoint(savedWordPoint)}
+        <small>/ ${WORD_SYSTEM_FULL_SCORE}</small>
+      </strong>
+
+      <span>คะแนน</span>
+    </div>
+
+    <button
+      type="button"
+      class="summary-continue-btn"
+      onclick="goToArticleFromHistory()"
+    >
+      ทำแบบทดสอบอ่านบทความ
+    </button>
+  `;
+}
+function goToArticleFromHistory() {
+  wordTestCompleted = true;
+  articleTestCompleted = false;
+
+  updateTestMenuState();
+  showView('menuView');
+}
+function showSavedFullSummary() {
+  showView('summaryView');
+
+  const grandTotal =
+    round1(
+      savedWordPoint +
+      savedArticlePoint
+    );
+
+  const averageScore =
+    document.getElementById('averageScore');
+
+  if (!averageScore) return;
+
+  averageScore.innerHTML = `
+    <div class="summary-score-list">
+
+      <div class="summary-score-row">
+        <span class="summary-score-label">
+          อ่านคำ
+        </span>
+
+        <span class="summary-score-value">
+          ${formatPoint(savedWordPoint)}
+          <small>/ ${WORD_SYSTEM_FULL_SCORE}</small>
+        </span>
+      </div>
+
+      <div class="summary-score-row">
+        <span class="summary-score-label">
+          อ่านบทความ
+        </span>
+
+        <span class="summary-score-value">
+          ${formatPoint(savedArticlePoint)}
+          <small>/ ${ARTICLE_SYSTEM_FULL_SCORE}</small>
+        </span>
+      </div>
+
+    </div>
+
+    <div class="summary-grand-total">
+      <span>รวม</span>
+
+      <strong>
+        ${formatPoint(grandTotal)}
+        <small>/ ${GRAND_TOTAL_FULL_SCORE}</small>
+      </strong>
+
+      <span>คะแนน</span>
+    </div>
+  `;
+}
 function startArticleTest() {
     if (!wordTestCompleted) {
     Swal.fire({
@@ -300,16 +501,19 @@ function showView(id) {
 }
 function updateTestMenuState() {
   const wordButton =
-    document.getElementById('wordTestMenuBtn');
+    document.getElementById(
+      'wordTestMenuBtn'
+    );
 
   const articleButton =
-    document.getElementById('articleTestMenuBtn');
+    document.getElementById(
+      'articleTestMenuBtn'
+    );
 
+  /*
+   * อ่านคำกดได้เฉพาะกรณียังไม่เคยทำ
+   */
   if (wordButton) {
-    /*
-     * เมื่ออ่านคำเสร็จแล้ว
-     * ปุ่มอ่านคำจะกดไม่ได้
-     */
     wordButton.disabled =
       wordTestCompleted;
 
@@ -319,17 +523,21 @@ function updateTestMenuState() {
     );
   }
 
+  /*
+   * อ่านบทความกดได้เมื่ออ่านคำแล้ว
+   * แต่ยังไม่เคยทำบทความ
+   */
+  const articleEnabled =
+    wordTestCompleted &&
+    !articleTestCompleted;
+
   if (articleButton) {
-    /*
-     * ปุ่มอ่านบทความกดได้
-     * เมื่ออ่านคำครบแล้วเท่านั้น
-     */
     articleButton.disabled =
-      !wordTestCompleted;
+      !articleEnabled;
 
     articleButton.classList.toggle(
       'test-menu-disabled',
-      !wordTestCompleted
+      !articleEnabled
     );
   }
 }
@@ -2479,6 +2687,13 @@ async function saveContinuousArticleResults(
 
 function showArticleSummary() {
   closeArticleRecognizer();
+articleTestCompleted = true;
+savedArticlePoint =
+  round1(sumPoints(articleSystemPoints));
+
+savedWordPoint =
+  round1(sumPoints(wordSystemPoints));
+
   showView('summaryView');
 
   const articlePoint =
