@@ -311,9 +311,6 @@ function renderIncompleteWordSummary(wordPoint) {
       'ทำแบบทดสอบยังไม่ครบ';
   }
 
-  /*
-   * ซ่อนปุ่มกลับหน้าเลือกแบบทดสอบ
-   */
   const backButton =
     document.querySelector(
       '#summaryView .summary-back-btn'
@@ -329,7 +326,7 @@ function renderIncompleteWordSummary(wordPoint) {
   if (!averageScore) return;
 
   averageScore.innerHTML = `
-    <div class="summary-score-list single-score">
+    <div class="summary-score-list">
 
       <div class="summary-score-row">
         <span class="summary-score-label">
@@ -340,6 +337,19 @@ function renderIncompleteWordSummary(wordPoint) {
           ${formatPoint(wordPoint)}
           <small>
             / ${WORD_SYSTEM_FULL_SCORE}
+          </small>
+        </span>
+      </div>
+
+      <div class="summary-score-row">
+        <span class="summary-score-label">
+          อ่านบทความ
+        </span>
+
+        <span class="summary-score-value summary-not-tested">
+          ยังไม่ทดสอบ
+          <small>
+            / ${ARTICLE_SYSTEM_FULL_SCORE}
           </small>
         </span>
       </div>
@@ -362,7 +372,7 @@ function renderIncompleteWordSummary(wordPoint) {
     <button
       type="button"
       class="summary-continue-btn"
-      onclick="continueToArticleTest()"
+      onclick="goToArticleFromHistory()"
     >
       ทำแบบทดสอบอ่านบทความ
     </button>
@@ -1244,12 +1254,7 @@ function continueToArticleTest() {
   articleTestCompleted = false;
 
   updateTestMenuState();
-
-  /*
-   * เปิดหน้าอ่านบทความโดยตรง
-   * ไม่ต้องผ่านหน้าเลือกแบบทดสอบ
-   */
-  startArticleTest();
+  showView('menuView');
 }
 /* =========================================================
    SYSTEM 2: CONTINUOUS ARTICLE READING
