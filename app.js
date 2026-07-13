@@ -362,7 +362,7 @@ function renderIncompleteWordSummary(wordPoint) {
       <strong>
         ${formatPoint(wordPoint)}
         <small>
-          / ${WORD_SYSTEM_FULL_SCORE}
+          / ${GRAND_TOTAL_FULL_SCORE}
         </small>
       </strong>
 
@@ -372,7 +372,7 @@ function renderIncompleteWordSummary(wordPoint) {
     <button
       type="button"
       class="summary-continue-btn"
-      onclick="goToArticleFromHistory()"
+      onclick="continueToArticleTest()"
     >
       ทำแบบทดสอบอ่านบทความ
     </button>
@@ -2815,10 +2815,12 @@ savedWordPoint =
     <div class="summary-grand-total">
       <span>รวม</span>
 
-      <strong>
-        ${formatPoint(grandTotal)}
-        <small>/ ${GRAND_TOTAL_FULL_SCORE}</small>
-      </strong>
+<strong>
+  ${formatPoint(wordPoint)}
+  <small>
+    / ${GRAND_TOTAL_FULL_SCORE}
+  </small>
+</strong>
 
       <span>คะแนน</span>
     </div>
