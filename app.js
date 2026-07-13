@@ -301,6 +301,31 @@ async function startWordTest() {
 function showSavedWordSummary() {
   showView('summaryView');
 
+  /*
+   * เปลี่ยนข้อความใต้ถ้วยรางวัล
+   */
+  const summaryTitle =
+    document.querySelector(
+      '#summaryView .summary-title'
+    );
+
+  if (summaryTitle) {
+    summaryTitle.textContent =
+      'ทำแบบทดสอบยังไม่ครบ';
+  }
+
+  /*
+   * ซ่อนปุ่มกลับหน้าเลือกแบบทดสอบ
+   */
+  const backButton =
+    document.querySelector(
+      '#summaryView .summary-back-btn'
+    );
+
+  if (backButton) {
+    backButton.style.display = 'none';
+  }
+
   const averageScore =
     document.getElementById('averageScore');
 
@@ -316,7 +341,9 @@ function showSavedWordSummary() {
 
         <span class="summary-score-value">
           ${formatPoint(savedWordPoint)}
-          <small>/ ${WORD_SYSTEM_FULL_SCORE}</small>
+          <small>
+            / ${WORD_SYSTEM_FULL_SCORE}
+          </small>
         </span>
       </div>
 
@@ -327,7 +354,9 @@ function showSavedWordSummary() {
 
       <strong>
         ${formatPoint(savedWordPoint)}
-        <small>/ ${WORD_SYSTEM_FULL_SCORE}</small>
+        <small>
+          / ${WORD_SYSTEM_FULL_SCORE}
+        </small>
       </strong>
 
       <span>คะแนน</span>
@@ -351,6 +380,25 @@ function goToArticleFromHistory() {
 }
 function showSavedFullSummary() {
   showView('summaryView');
+
+  const summaryTitle =
+    document.querySelector(
+      '#summaryView .summary-title'
+    );
+
+  if (summaryTitle) {
+    summaryTitle.textContent =
+      'ทำแบบทดสอบครบแล้ว';
+  }
+
+  const backButton =
+    document.querySelector(
+      '#summaryView .summary-back-btn'
+    );
+
+  if (backButton) {
+    backButton.style.display = '';
+  }
 
   const grandTotal =
     round1(
@@ -765,7 +813,33 @@ const phraseList =
   SpeechSDK.PhraseListGrammar
     .fromRecognizer(recognizer);
 
-phraseList.addPhrase(item.word);
+const phraseVariants =
+  new Set([
+    String(item.word || '').trim()
+  ]);
+
+if (item.reading) {
+  const reading =
+    String(item.reading).trim();
+
+  if (reading) {
+    phraseVariants.add(reading);
+
+    phraseVariants.add(
+      reading.replace(/-/g, '')
+    );
+
+    phraseVariants.add(
+      reading.replace(/-/g, ' ')
+    );
+  }
+}
+
+phraseVariants.forEach(phrase => {
+  if (phrase) {
+    phraseList.addPhrase(phrase);
+  }
+});
 
 if (
   typeof phraseList.setWeight === 'function'
@@ -1158,7 +1232,24 @@ function showWordSummary() {
   updateTestMenuState();
 
   showView('summaryView');
+const summaryTitle =
+  document.querySelector(
+    '#summaryView .summary-title'
+  );
 
+if (summaryTitle) {
+  summaryTitle.textContent =
+    'ทำแบบทดสอบยังไม่ครบ';
+}
+
+const backButton =
+  document.querySelector(
+    '#summaryView .summary-back-btn'
+  );
+
+if (backButton) {
+  backButton.style.display = 'none';
+}
   const totalPoint =
     round1(sumPoints(wordSystemPoints));
 
@@ -2686,6 +2777,24 @@ async function saveContinuousArticleResults(
 }
 
 function showArticleSummary() {
+  const summaryTitle =
+  document.querySelector(
+    '#summaryView .summary-title'
+  );
+
+if (summaryTitle) {
+  summaryTitle.textContent =
+    'ทำแบบทดสอบครบแล้ว';
+}
+
+const backButton =
+  document.querySelector(
+    '#summaryView .summary-back-btn'
+  );
+
+if (backButton) {
+  backButton.style.display = '';
+}
   closeArticleRecognizer();
 articleTestCompleted = true;
 savedArticlePoint =
