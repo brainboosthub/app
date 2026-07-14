@@ -2930,7 +2930,7 @@ savedWordPoint =
       <span>รวม</span>
 
 <strong>
-  ${formatPoint(wordPoint)}
+  ${formatPoint(grandTotal)}
   <small>
     / ${GRAND_TOTAL_FULL_SCORE}
   </small>
